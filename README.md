@@ -57,6 +57,9 @@ silicon Macs run it on MPS (see macOS below).
 
 **macOS (Apple silicon):** Follow [macOS setup](docs/macos.md): the same pipeline runs on Apple MPS, without CUDA or Triton.
 
+**AMD ROCm (Linux):** Follow [ROCm setup](docs/rocm.md): a Docker image for AMD GPUs, validated on Strix Halo
+(Radeon 8060S, gfx1151), with a faster sampler for bandwidth-bound GPUs.
+
 **Linux:** Install the dependencies below and make `ffmpeg` available on your `PATH`.
 
 ```bash

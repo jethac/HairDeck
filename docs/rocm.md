@@ -32,9 +32,13 @@ What the image contains:
 | Mesa | 26.2.5, built from source (`docker/build-mesa.sh`) | Ubuntu 22.04's Mesa 23.2 predates RDNA 3.5: `amdgpu: unknown (family_id, chip_external_rev): (150, 193)`, and `eglInitialize` fails. The build is headless radeonsi (EGL device / surfaceless, GBM, GL 4.6, ACO shaders, no LLVM), used by pyrender for the CHARM scan, colour targets and previews |
 | libdrm | 2.4.134, built from source | Mesa 26.2 needs ≥ 2.4.133 |
 | Python deps | `requirements-rocm.txt` (= `requirements.txt` without torch/torchvision) | installed into the image Python with `docker/rocm-constraints.txt` pinning the ROCm torch / torchvision / triton. In a venv, uv resolves a CUDA torch from PyPI instead |
+| torchvision | 0.28.0 at the base image's commit, rebuilt with HIP kernels (`docker/build-torchvision.sh`) | the base image's torchvision has CPU-only ops: `torchvision::deform_conv2d` (BiRefNet-matting's decoder), `nms` and `roi_align` (SAM 3) fail on the GPU with `Could not run 'torchvision::...' with arguments from the 'CUDA' backend` |
 
-Check the environment: `python tools/rocm/smoke.py` prints the GPU, a bf16 attention result and the EGL renderer
-string, which should read `AMD Radeon 8060S Graphics (radeonsi, strix_halo, ACO, ...)`.
+Check the environment: `python tools/rocm/smoke.py` prints the GPU, a bf16 attention result, the torchvision GPU ops
+and the EGL renderer string, which should read `AMD Radeon 8060S Graphics (radeonsi, strix_halo, ACO, ...)`.
+
+For another ROCm GPU, build with `--build-arg PYTORCH_ROCM_ARCH=gfx1100` (etc.); the base image's PyTorch must have
+kernels for it. Mesa 26.2 supports every RDNA generation.
 
 ### What did not need porting
 
@@ -59,7 +63,70 @@ The released test-set evaluations run unchanged (`scripts/test.py`), seed 0, aga
 |---|---|---|---|---|---|---|
 | Paper (RTX A6000) | 0.279 | 0.625 | 0.585 | 0.702 | 0.0167 | 0.953 |
 | ROCm gfx1151 | 0.277 | 0.620 | 0.596 | 0.701 | 0.0168 | 0.956 |
+| ROCm gfx1151, fast sampler (below) | 0.277 | 0.620 | 0.598 | 0.702 | 0.0168 | 0.958 |
+
+| Table 4, chains on the point-cloud model's cards | CD | Rec. | Prec. | Fit |
+|---|---|---|---|---|
+| Paper (RTX A6000) | 0.319 | 0.542 | 0.543 | 0.952 |
+| ROCm gfx1151, fast sampler | 0.298 | 0.566 | 0.542 | 0.944 |
+
+With the fast sampler Table 1 reads 0.0065 / 0.0084 / 0.0241 / 0.869 / 16.4°.
+
+Other checks on gfx1151:
+- BiRefNet-matting (fp16, GPU) against the same model in fp32 on the CPU (`tools/rocm/check_matte.py`): mean
+  |Δalpha| 0.0002, mask IoU 0.999.
+- VRM export and previews (`tools/rocm/make_vrm_fixture.py`, then `python -m hairdeck.vrm.export DIR 0`): Blender
+  4.2 with the VRM Add-on, `hairdeck.vrm.check` passing, the rest-pose sheet and the head-turn video rendered through
+  EGL on radeonsi.
+- Not run here: the image pipeline end to end (SAM 3 and DINOv3 are gated downloads). Its parts run on the paths
+  checked above: SAM 3 on flash SDPA and torchvision's HIP ops, the image DiT on the same set-DiT sampler as the
+  point-cloud and chain DiTs.
 
 ## Performance
 
-PERF_PLACEHOLDER
+The set DiTs (point-cloud, image and chain models) sample 50 Euler steps with CFG 2. At batch 1 on Strix Halo their
+GEMMs are small (M = 2 x 192 tokens) and a step is dominated by bandwidth-bound and launch-bound work rather than
+matrix throughput. `hairdeck/sampling/fast.py` restructures the sampler, on by default on ROCm builds of PyTorch:
+
+1. **Condition terms once per call.** The condition is fixed while sampling, so each block's cross-attention K/V
+   (after their RMSNorm) and the pooled condition embedding are computed once instead of once per step.
+2. **adaLN modulations for all steps in one GEMM per block.** `ada(silu(t_mlp(t) + pool))` depends only on the step;
+   at M = 2 that projection reads 10.6 MB of weights per block and step at ~150 GB/s.
+3. **bf16 weight copies.** Made once per model, instead of autocast casting every fp32 weight on every call.
+4. **`torch.compile` of the step.** Inductor fuses the LayerNorms, RMSNorms, modulations, GELU, residuals and CFG
+   combination between the GEMMs into Triton kernels for gfx1151. In the eager step these small kernels take about
+   half the time.
+
+Point-cloud model, batch 1, cards from the Dora condition (`tools/rocm/bench_pc.py`, warm):
+
+| | sampling + decode | vs original |
+|---|---|---|
+| Original sampler (`HAIRDECK_FAST=0`) | 0.67 s | |
+| 1-3, eager (`HAIRDECK_COMPILE=0`) | 0.45 s | 1.5x |
+| 1-4 (default) | **0.31 s** | **2.2x** |
+
+At batch 4: 1.85 s, 1.32 s and 0.87 s. The paper reports 1.01 s per hairstyle from the point cloud on an RTX A6000.
+
+Numerics: with one step, the restructured forward is bitwise identical to `SetDiT.forward` under the same autocast
+(`tools/rocm/check_fast.py`). Batching the adaLN GEMM over steps and fusing with inductor change the rounding, well
+below autocast's own deviation from fp32 (0.6-1% of |v|). Over 50 steps that gives a different but equally likely
+sample: the test-set metrics above are unchanged.
+
+The first sampling call per model and batch size compiles (about a minute cold; a few seconds from the inductor cache in
+`$HAIRDECK_ROOT/.cache/inductor`). The first BiRefNet call (MIOpen's convolution search, cached in
+`$HAIRDECK_ROOT/.cache/miopen`) takes about 40 s once. The demo pays both once per container.
+
+Settings: `HAIRDECK_FAST=0` restores the release sampler; `HAIRDECK_COMPILE=0` keeps 1-3 without compilation (and is
+the fallback if compilation fails); `HAIRDECK_GRAPHS=1` also captures the step in a HIP graph.
+
+Tried and not adopted:
+- **HIP graph replay** of the step: 3% faster than plain launches without compilation and slower with it, on ROCm
+  7.2. It also deadlocks when PyTorch TunableOp is enabled, because hipBLASLt cannot tune or look up inside a capture.
+  Off by default; always off under TunableOp.
+- **PyTorch TunableOp** (`tools/rocm/tune_gemm.sh`): rocBLAS / hipBLASLt solutions tuned for the 29 GEMM shapes moved
+  the step by less than the run-to-run spread.
+- **`TORCH_BLAS_PREFER_HIPBLASLT=0`**: rocBLAS is faster than hipBLASLt for some of these shapes in isolation
+  (`tools/rocm/gemm_probe.py`), within noise end to end.
+- **Forcing the GPU's DPM level to `high`**: no change; under load the 8060S already runs at 2.3-2.9 GHz.
+- **Compiling BiRefNet**: 270 to 210 ms per image, for 56 s of compilation and up to 0.05 alpha difference (fp16
+  reassociation) in a once-per-image step. Left eager.

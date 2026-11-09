@@ -27,3 +27,12 @@ if os.environ.get('PROFILE'):
     with profile(activities=[ProfilerActivity.CUDA]) as prof:
         m(rgb); torch.cuda.synchronize()
     print(prof.key_averages().table(sort_by='cuda_time_total', row_limit=20))
+
+if os.environ.get('COMPILE'):
+    ref = m(rgb)
+    m.net = torch.compile(m.net, dynamic=False)
+    for i in range(4):
+        torch.cuda.synchronize(); t = time.perf_counter()
+        a = m(rgb)
+        torch.cuda.synchronize()
+        print(f'compiled run {i}: {(time.perf_counter() - t) * 1e3:.1f} ms  max|d alpha| {(a - ref).abs().max().item():.4f}')

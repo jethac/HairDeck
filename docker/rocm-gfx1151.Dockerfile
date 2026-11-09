@@ -25,6 +25,12 @@ RUN uv pip install --system --break-system-packages -c /tmp/rocm-constraints.txt
  && uv pip install --system --break-system-packages --no-deps pyrender==0.1.45 \
  && python3 -c "import torch; assert torch.version.hip, torch.__version__"
 
+# torchvision with its HIP kernels (the base image's build has CPU-only deform_conv2d / nms / roi_align). Built for
+# gfx1151 by default; the build needs the GPU only for the final check, so docker build runs it with the GPU optional.
+ARG PYTORCH_ROCM_ARCH=gfx1151
+COPY docker/build-torchvision.sh /tmp/build-torchvision.sh
+RUN SKIP_GPU_CHECK=1 PYTORCH_ROCM_ARCH=${PYTORCH_ROCM_ARCH} bash /tmp/build-torchvision.sh && rm /tmp/build-torchvision.sh
+
 ENV PYOPENGL_PLATFORM=egl HAIRDECK_ROOT=/workspace/hairdeck-root HF_HOME=/root/.cache/huggingface \
     MIOPEN_USER_DB_PATH=/workspace/hairdeck-root/.cache/miopen \
     TRITON_CACHE_DIR=/workspace/hairdeck-root/.cache/triton \

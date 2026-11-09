@@ -26,7 +26,8 @@ def timed(fn):
 
 def run(model, cond, n_tok, dim, mode):
     os.environ['HAIRDECK_FAST'] = '0' if mode == 'orig' else '1'
-    os.environ['HAIRDECK_GRAPHS'] = '1' if mode == 'graph' else '0'
+    os.environ['HAIRDECK_GRAPHS'] = '1' if mode in ('graph', 'compile') else '0'
+    os.environ['HAIRDECK_COMPILE'] = '1' if mode in ('compile', 'compile_nograph') else '0'
     g = torch.Generator(device='cuda').manual_seed(0)
     with torch.no_grad(), torch.autocast('cuda', dtype=torch.bfloat16):
         return fm_sample(model, model.encode_cond(cond), n_tok, dim, 50, 2.0, 1.0, g, 'euler')
@@ -48,3 +49,24 @@ for B in (1, 4):
     for mode, (x, dt) in res.items():
         print(f'pc_dit B={B} {mode:8s} {dt * 1e3:7.1f} ms  max|dx| {(x - ref).abs().max().item():.3g}  '
               f'bitwise {torch.equal(x, ref)}')
+
+# One velocity evaluation at a few t: the restructured forward against the module's, relative to the module's noise
+# floor (the module's own fp32-weights forward against its bf16 autocast forward).
+from hairdeck.sampling.fast import _Denoiser  # noqa: E402
+cond = torch.randn(1, 512, 768, device='cuda').half()
+x = torch.randn(2, 192, tok.dim, device='cuda')
+with torch.no_grad():
+    with torch.autocast('cuda', dtype=torch.bfloat16):
+        ctx = model.encode_cond(cond)
+    for t in (1.0, 0.5, 0.02):
+        T = torch.full((1, 1), t, device='cuda')
+        tt = torch.full((2,), t, device='cuda')
+        drop = torch.tensor([False, True], device='cuda')
+        with torch.autocast('cuda', dtype=torch.bfloat16):
+            ref = model(x, tt, torch.cat([ctx, ctx]), drop).float()
+            d = _Denoiser(model, ctx, 2.0, T)
+            fast = d.forward(x, [a[0] for a in d.ada], d.f_ada[0]).float()
+        full = model(x, tt, torch.cat([ctx, ctx]).float(), drop).float()  # fp32 reference
+        n = ref.norm()
+        print(f't={t}: |fast-autocast|/|v| {(fast - ref).norm() / n:.2e}   |autocast-fp32|/|v| {(ref - full).norm() / n:.2e}'
+              f'   |fast-fp32|/|v| {(fast - full).norm() / n:.2e}')
