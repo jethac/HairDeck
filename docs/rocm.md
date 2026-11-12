@@ -144,3 +144,22 @@ uncached warm request 1.850 s; first cached request 1.796 s; repeated image 0.68
 to 0.002 s. Card tokens, colored-card JSON and chain JSON for the same seed were identical. These are single-run
 measurements on the deployed Strix Halo, not a broad throughput benchmark. The generation subtotal now excludes color
 time, which was previously also counted in that subtotal; total wall time was unaffected by that reporting error.
+
+## Further optimization measurements (2026-11-12)
+
+`tools/rocm/bench_sam3.py` measures real example preprocessing, vision, grounding and mask agreement. On examples 1-3,
+eager preprocessing took 1.04-1.08 s. Compiling the vision backbone took 18.3 s on the first call and reduced warm
+preprocessing to 1.00 s. Hair/face/person mask IoUs were 0.9973-0.9999 with unchanged crop boxes. Compiling grounding
+components (`--grounding`) took 37.8 s initially and reduced preprocessing to 0.96-0.97 s; mask IoUs were
+0.9994-0.99998 with unchanged boxes. Both remain experiments rather than default behavior: modest gains and nonzero
+mask changes need a deliberate quality/performance choice. The probe retains stage timing for further investigation.
+
+Preview video frames now stream directly to ffmpeg, avoiding PNG compression, temporary files and PNG decoding.
+On the cache benchmark's 94-card, 24-chain example, the 90-frame preview took 2.41 s versus 3.58 s through PNG files;
+render/stream time was 1.23 s and encoder flush 0.05 s. Encoding overlaps rendering, so the latter is not total encoding
+CPU time. A diagnostic sent the same rendered frames through both paths and confirmed identical decoded RGB video
+hashes. Separate rendering runs are not bitwise deterministic and are unsuitable for testing encoding equivalence.
+
+The target also exposes its NPU (`amdxdna`, `/dev/accel/accel0`). AMD's Linux Ryzen AI documentation now describes
+CNN INT8/BF16 and encoder NLP BF16 compilation: https://ryzenai.docs.amd.com/en/latest/linux.html . NPU use remains
+unimplemented: operator coverage, model conversion, precision effects and end-to-end benefit must be established.
