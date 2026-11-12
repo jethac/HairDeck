@@ -1,0 +1,18 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": true,
+  "success": true,
+  "session_seconds": 2.6448093600047287,
+  "providers": [
+    "CPUExecutionProvider"
+  ],
+  "relative_l2": 2.1778075733891455e-06,
+  "alpha_mean_abs": 1.4447271823314622e-08,
+  "alpha_max_abs": 3.93986701965332e-05,
+  "mask_iou": 1.0,
+  "profile": "/home/jethac/hairdeck-root/results/npu-matte-grid/cpu-reference-ort-profile_2026-11-13_00-58-06_110.json",
+  "profile_provider_events": {
+    "CPUExecutionProvider": 7938
+  }
+}

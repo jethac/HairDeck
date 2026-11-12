@@ -95,6 +95,12 @@ succeeded in 9.377 s and produced an approximately 890 MiB model. Export time ex
 the reference/decomposition comparison and its first-use convolution searches.
 [Export result](measurements/strix-halo-matte-grid-export.json).
 
+The exported ONNX graph also ran through native ONNX Runtime 1.30 CPU execution against the saved
+PyTorch FP32 reference. Relative L2 was **2.178e-6**, mean alpha difference **1.445e-8**, maximum alpha
+difference **3.940e-5**, and threshold-0.5 mask IoU **1.0** on this image. This independently validates
+the exported graph before judging the NPU result. [CPU export comparison](measurements/strix-halo-matte-grid-onnx-cpu.json).
+Pass `--cpu-reference` to the native stage command below to reproduce it; it does not benchmark latency.
+
 Reproduce the export in the GPU container:
 
 ```bash
