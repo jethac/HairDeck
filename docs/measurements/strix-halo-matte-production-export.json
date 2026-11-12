@@ -1,0 +1,20 @@
+{
+  "torch": "2.13.0+git733fca1",
+  "shape": [
+    1,
+    3,
+    768,
+    768
+  ],
+  "dtype": "torch.float32",
+  "decomposition": true,
+  "compact_grid": true,
+  "flat_heads": true,
+  "stable_coordinates": true,
+  "pipeline_input": true,
+  "reference_precision": "FP32 arithmetic with the production wrapper FP16 weights widened to FP32",
+  "opset": 17,
+  "exporter": "legacy",
+  "success": true,
+  "seconds": 6.441295493015787
+}

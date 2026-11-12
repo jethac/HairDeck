@@ -21,16 +21,20 @@ parser.add_argument('--decompose', action='store_true')
 parser.add_argument('--compact-grid', action='store_true', help='Use one GridSample per deformable convolution')
 parser.add_argument('--stable-coordinates', action='store_true', help='Normalize base coordinates before adding scaled offsets')
 parser.add_argument('--flat-heads', action='store_true', help='Fold Swin window/head axes to avoid invalid attention buffer tiling')
+parser.add_argument('--size', type=int, default=1024, help='Model resolution: historical standalone probe 1024; deployed best preset 768')
+parser.add_argument('--pipeline-input', action='store_true', help='Use the application alpha-compositing rule')
 args = parser.parse_args()
 args.compact_grid = args.compact_grid or args.stable_coordinates or args.flat_heads
 args.decompose = args.decompose or args.compact_grid
 name = 'npu-matte-grid-compact' if args.compact_grid else 'npu-matte-grid' if args.decompose else 'npu-matte-export'
 name += ('-flat' if args.flat_heads else '')+('-stable' if args.stable_coordinates else '')
 if args.flat_heads: name += '-broadcast'
+if args.size != 1024: name += f'-{args.size}'
+if args.pipeline_input: name += '-pipeline'
 root = Path(paths.results(name))
 root.mkdir(parents=True, exist_ok=True)
-model = build('birefnet_matting', 1024, device='cuda').net
-x = torch.zeros(1, 3, 1024, 1024, device='cuda', dtype=torch.float16)
+model = build('birefnet_matting', args.size, device='cuda').net
+x = torch.zeros(1, 3, args.size, args.size, device='cuda', dtype=torch.float16)
 if args.decompose:
     from deform_grid import deform_conv2d
     if args.compact_grid:
@@ -39,12 +43,21 @@ if args.decompose:
         from functools import partial
         deform_conv2d = partial(deform_conv2d, stable_coordinates=True)
     import torch.nn.functional as F
-    model.float()
-    rgb = np.asarray(Image.open(paths.data('demo_examples', 'ex02.png')).convert('RGB')).copy()
+    image_path = paths.data('demo_examples', 'ex02.png')
+    if args.pipeline_input:
+        from hairdeck.prep.preprocess import load_image, BG
+        _, im_model, _ = load_image(image_path, True, BG['black'])
+        rgb = np.asarray(im_model).copy()
+    else:
+        rgb = np.asarray(Image.open(image_path).convert('RGB')).copy()
     x = torch.from_numpy(rgb).cuda().permute(2, 0, 1)[None].float()/255
-    x = F.interpolate(x, (1024, 1024), mode='bilinear', align_corners=False)
+    x = F.interpolate(x, (args.size, args.size), mode='bilinear', align_corners=False)
     x = (x-torch.tensor([.485,.456,.406],device='cuda')[None,:,None,None])/torch.tensor([.229,.224,.225],device='cuda')[None,:,None,None]
     with torch.no_grad():
+        production_logits = model(x.half())[-1]
+        production_reference = production_logits.float()
+        production_alpha = production_logits.sigmoid().float()
+        model.float()  # FP32 arithmetic on the wrapper's existing FP16-rounded weights.
         reference = model(x)[-1].float()
         module = sys.modules[type(model).__module__]
         module.deform_conv2d = deform_conv2d
@@ -65,11 +78,14 @@ if args.decompose:
     print('EQUIVALENCE', json.dumps(metrics), flush=True)
     if not torch.isfinite(decomposed).all() or metrics['relative_l2'] > 0.001:
         raise RuntimeError('Decomposition changed real model output too much; do not export')
-    np.savez(root/'reference.npz', x=x.cpu().numpy(), y=reference.cpu().numpy())
+    np.savez(root/'reference.npz', x=x.cpu().numpy(), y=reference.cpu().numpy(),
+             production_y=production_reference.cpu().numpy(), production_alpha=production_alpha.cpu().numpy())
 start = time.perf_counter()
 result = dict(torch=torch.__version__, shape=list(x.shape), dtype=str(x.dtype),
               decomposition=args.decompose, compact_grid=args.compact_grid,
               flat_heads=args.flat_heads, stable_coordinates=args.stable_coordinates,
+              pipeline_input=args.pipeline_input,
+              reference_precision='FP32 arithmetic with the production wrapper FP16 weights widened to FP32',
               opset=17, exporter='legacy', success=False)
 try:
     with torch.no_grad():

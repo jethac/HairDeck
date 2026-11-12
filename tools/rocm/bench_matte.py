@@ -1,4 +1,6 @@
-"""BiRefNet-matting latency on one demo image (the preprocessing's person matte, fp16 at 1024 px).
+"""Standalone BiRefNet-matting latency on one demo image, fp16 at 1024 px.
+
+The deployed 'best' preset uses 768 px; this historical standalone probe is not that stage's latency.
 
 python tools/rocm/bench_matte.py [IMAGE]
 """

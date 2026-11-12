@@ -143,7 +143,8 @@ Tried and not adopted:
 - **`TORCH_BLAS_PREFER_HIPBLASLT=0`**: rocBLAS is faster than hipBLASLt for some of these shapes in isolation
   (`tools/rocm/gemm_probe.py`), within noise end to end.
 - **Forcing the GPU's DPM level to `high`**: no change; under load the 8060S already runs at 2.3-2.9 GHz.
-- **Compiling BiRefNet**: 270 to 210 ms per image, for 56 s of compilation and up to 0.05 alpha difference (fp16
+- **Compiling BiRefNet**, standalone 1024px probe (the deployed `best` preset uses 768px): 270 to 210 ms per image,
+  for 56 s of compilation and up to 0.05 alpha difference (fp16
   reassociation) in a once-per-image step. Left eager.
 
 ## Repeated-image cache (2026-11-12)

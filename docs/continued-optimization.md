@@ -4,6 +4,18 @@ The NPU's corrected BF16 MLP is still slower than the compiled GPU MLP. Working 
 justify inserting it into the GPU sampler. This pass measures batching and repeated GPU work, and probes
 whether the existing independent matting stage can reach the NPU compiler.
 
+**Measurement boundary correction:** the deployed `best` preset in `hairdeck/prep/presets.json` uses
+BiRefNet at **768px**, although SAM's working resolution is 1024px. The earlier standalone matting
+benchmarks and export/compilation diagnostics below used **1024px**. They are not measurements of the
+deployed matting configuration. The production-size experiment at the end uses 768px and the actual
+alpha-compositing rule. Matting still runs for transparent inputs; the input alpha limits its result
+afterward rather than bypassing the network.
+
+Reference-precision convention: these export probes load the production wrapper's FP16 weights and
+widen them for FP32 arithmetic before comparing reformulations. "FP32 reference" below means that
+unchanged pre-reformulation model, not a reload of the unrounded FP32 checkpoint. The production-size
+probe additionally retains the original FP16 logits and FP16 sigmoid output for a direct comparison.
+
 ## Optional batched image variations
 
 `Pipeline.run(..., batch_variations=True)` batches the image DiT across independently seeded noise tensors.
@@ -252,4 +264,24 @@ this attempt, so it will not contaminate inference timings if the numerical gate
 [FP32 equivalence](measurements/strix-halo-matte-broadcast-equivalence.json),
 [export metadata](measurements/strix-halo-matte-broadcast-export.json),
 [ONNX CPU comparison](measurements/strix-halo-matte-broadcast-onnx-cpu.json).
-Whole-stage NPU execution and performance are still unproven.
+That 1024px diagnostic was subsequently cancelled after the deployed resolution was confirmed, retaining
+its artifacts without an execution result. [Cancellation record](measurements/strix-halo-matte-broadcast-cancelled.json).
+
+### Match the deployed 768px matting stage
+
+```bash
+python tools/rocm/export_npu_matte.py --flat-heads --stable-coordinates --size 768 --pipeline-input
+```
+
+This uses the complete same BiRefNet model, at the resolution already configured by the live `best`
+preset. It is not a smaller replacement model or a newly reduced-quality preset. `--pipeline-input`
+uses the application's handling of transparent pixels before resizing and normalization.
+The original FP16 network's sigmoid alpha is saved alongside the FP32-arithmetic reference; the native
+probe compares against both before accepting any latency measurements.
+
+The export and ONNX CPU comparison passed. The native NPU attempt uses the separate artifact directory
+`npu-matte-grid-compact-flat-stable-broadcast-768-pipeline` and is still pending.
+[Reformulation comparison](measurements/strix-halo-matte-production-equivalence.json),
+[export configuration](measurements/strix-halo-matte-production-export.json),
+[CPU and original FP16-alpha comparisons](measurements/strix-halo-matte-production-onnx-cpu.json).
+Whole-stage NPU execution and performance remain unproven.

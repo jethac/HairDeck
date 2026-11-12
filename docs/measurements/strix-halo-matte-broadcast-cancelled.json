@@ -1,0 +1,6 @@
+{
+  "status": "cancelled_superseded",
+  "reason": "Superseded by verified deployed best preset: 768px matte with pipeline alpha compositing. This 1024px diagnostic had no execution result.",
+  "process_snapshot": "    PID     ELAPSED     TIME %CPU   RSS\n 164012       08:53 00:09:02  101 12514112\n",
+  "cancelled_utc": "2026-11-12T16:53:23.477190+00:00"
+}

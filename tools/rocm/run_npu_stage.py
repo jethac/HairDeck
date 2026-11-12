@@ -63,6 +63,13 @@ try:
         report['alpha_max_abs'] = float(np.abs(alpha-alpha_ref).max())
         report['mask_iou'] = float(np.count_nonzero(a & b)/max(1, np.count_nonzero(a | b)))
         alpha_ok = report['alpha_mean_abs'] <= .001 and report['mask_iou'] >= .99
+        if 'production_alpha' in data:
+            target = data['production_alpha']
+            target_mask = target > .5
+            report['production_alpha_mean_abs'] = float(np.abs(alpha-target).mean())
+            report['production_alpha_max_abs'] = float(np.abs(alpha-target).max())
+            report['production_mask_iou'] = float(np.count_nonzero(a & target_mask)/max(1, np.count_nonzero(a | target_mask)))
+            alpha_ok = alpha_ok and report['production_alpha_mean_abs'] <= .001 and report['production_mask_iou'] >= .99
     report['profile'] = session.end_profiling()
     events = json.loads(Path(report['profile']).read_text())
     placements = {}
