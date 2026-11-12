@@ -1,0 +1,8 @@
+{
+  "status": "compiler_failed",
+  "exit_code": 1,
+  "error_lines": [
+    "E0000 00:00:1794501650.431496  162922 message_lite.cc:601] onnx.ModelProto exceeded maximum protobuf size of 2GB: 3579387916",
+    "check failure: resultmodel serialize to string error"
+  ]
+}

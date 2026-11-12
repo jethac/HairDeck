@@ -1,0 +1,7 @@
+{
+  "status": "cancelled_superseded",
+  "reason": "Original attention layout superseded by a reduced real-module NPU-validated flat-head workaround after the compact whole-model buffer failure; no execution result from this attempt.",
+  "pid": 155415,
+  "process_snapshot": "    PID     ELAPSED     TIME %CPU   RSS\n 155415       50:32 00:50:55  100 12268412\n",
+  "cancelled_utc": "2026-11-12T16:44:01.249618+00:00"
+}

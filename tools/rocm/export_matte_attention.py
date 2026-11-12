@@ -12,7 +12,7 @@ from hairdeck.prep.matte import build
 parser = argparse.ArgumentParser()
 parser.add_argument('--flat-heads', action='store_true')
 args = parser.parse_args()
-root = Path(paths.results('npu-matte-attention-flat' if args.flat_heads else 'npu-matte-attention'))
+root = Path(paths.results('npu-matte-attention-flat-broadcast' if args.flat_heads else 'npu-matte-attention'))
 root.mkdir(parents=True, exist_ok=True)
 model = build('birefnet_matting', 1024, device='cuda').net.float()
 attention = dict(model.named_modules())['bb.layers.1.blocks.0.attn']

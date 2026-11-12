@@ -26,6 +26,7 @@ args.compact_grid = args.compact_grid or args.stable_coordinates or args.flat_he
 args.decompose = args.decompose or args.compact_grid
 name = 'npu-matte-grid-compact' if args.compact_grid else 'npu-matte-grid' if args.decompose else 'npu-matte-export'
 name += ('-flat' if args.flat_heads else '')+('-stable' if args.stable_coordinates else '')
+if args.flat_heads: name += '-broadcast'
 root = Path(paths.results(name))
 root.mkdir(parents=True, exist_ok=True)
 model = build('birefnet_matting', 1024, device='cuda').net

@@ -1,0 +1,19 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": false,
+  "validate_only": true,
+  "feature_output": true,
+  "layout": "auto",
+  "success": true,
+  "session_seconds": 8.653572629002156,
+  "providers": [
+    "VitisAIExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "relative_l2": 0.011145728640258312,
+  "profile": "/home/jethac/hairdeck-root/results/npu-matte-attention-flat-broadcast/npu-ort-profile_2026-11-13_01-42-57_026.json",
+  "profile_provider_events": {
+    "VitisAIExecutionProvider": 1
+  }
+}

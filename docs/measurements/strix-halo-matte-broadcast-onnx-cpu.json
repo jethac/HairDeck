@@ -1,0 +1,21 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": true,
+  "validate_only": false,
+  "feature_output": false,
+  "layout": "auto",
+  "success": true,
+  "session_seconds": 1.39898593199905,
+  "providers": [
+    "CPUExecutionProvider"
+  ],
+  "relative_l2": 2.1925461624050513e-06,
+  "alpha_mean_abs": 1.74113061746084e-08,
+  "alpha_max_abs": 3.8683414459228516e-05,
+  "mask_iou": 1.0,
+  "profile": "/home/jethac/hairdeck-root/results/npu-matte-grid-compact-flat-stable-broadcast/cpu-reference-ort-profile_2026-11-13_01-44-23_793.json",
+  "profile_provider_events": {
+    "CPUExecutionProvider": 2910
+  }
+}

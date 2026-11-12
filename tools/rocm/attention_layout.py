@@ -35,11 +35,13 @@ def flat_window_attention(module, x, mask=None):
     scores = (q*module.scale) @ k.transpose(-2, -1)
     bias = module.relative_position_bias_table[module.relative_position_index.reshape(-1)]
     bias = bias.reshape(n, n, heads).permute(2, 0, 1)
-    scores = scores+bias[None].expand(b, -1, -1, -1).reshape(b*heads, n, n)
+    # Broadcast in the original window/head axes. Explicitly repeating the bias
+    # before flattening makes VAIML constant-fold gigabytes of duplicate values.
+    scores = scores.reshape(b, heads, n, n)+bias[None]
     if mask is not None:
         nw = int(mask.shape[0])
         scores = scores.reshape(b//nw, nw, heads, n, n)+mask[None, :, None]
-        scores = scores.reshape(b*heads, n, n)
+    scores = scores.reshape(b*heads, n, n)
     probs = module.attn_drop(module.softmax(scores))
     out = (probs @ v).reshape(b, heads, n, c//heads).transpose(1, 2).reshape(b, n, c)
     return module.proj_drop(module.proj(out))

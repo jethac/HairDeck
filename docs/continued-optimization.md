@@ -198,9 +198,10 @@ NPU evidence. Retaining the real attention module and weights preserves the fail
 
 [Captured attention metadata](measurements/strix-halo-matte-attention-export.json),
 [compiler errors and exit codes](measurements/strix-halo-matte-buffer-failures.json).
-The original, larger decomposition compile remains a separate running experiment; do not treat the
-compact model's failure as its result. Further work should use the attention reduction to investigate
-tiling before paying another full-model compilation cost.
+The original, larger decomposition compile was a separate experiment; do not treat the compact model's
+failure as its result. It was subsequently cancelled as superseded by the validated attention-layout
+workaround, after 50:32 elapsed, preserving its artifacts and recording no execution result.
+[Cancellation record](measurements/strix-halo-matte-original-cancelled.json).
 
 ### Equivalent attention layout compiles on the NPU
 
@@ -229,5 +230,26 @@ Against the unchanged full FP32 BiRefNet on example 2, relative L2 was **3.623e-
 ONNX CPU check before a new native NPU compilation was started with `--validate-only`.
 [Full-model equivalence](measurements/strix-halo-matte-reformulated-equivalence.json),
 [export metadata](measurements/strix-halo-matte-reformulated-export.json).
-Its artifacts live under `npu-matte-grid-compact-flat-stable`; whole-stage NPU correctness and latency
-remain pending.
+Its artifacts live under `npu-matte-grid-compact-flat-stable`; that particular native attempt subsequently
+failed for the constant-expansion reason below, before execution.
+
+### Preserve broadcasting to avoid a compiler serialization limit
+
+The first full flat-head export was approximately 887 MiB, but the native compiler's internal ONNX
+model grew to **3,579,387,916 bytes**, exceeding protobuf's 2 GiB model-serialization limit. Explicitly
+expanding relative-position bias across all windows before flattening allowed the compiler to materialize
+large repeated constants. [Native error](measurements/strix-halo-matte-expanded-bias-failure.json).
+
+The adapter now adds the bias while scores have their original `[windows,heads,tokens,tokens]` shape,
+using broadcasting, and then flattens scores again. This retains the three-dimensional attention
+matrix products that avoided the tiling failure, without repeating the bias tensor. The captured
+attention module still compiles and passes NPU validation with relative L2 **0.011146**.
+[Native reduced-module result](measurements/strix-halo-matte-attention-broadcast-npu.json).
+
+The combined model again passed its original FP32 and ONNX CPU comparisons, and the current native
+attempt uses `npu-matte-grid-compact-flat-stable-broadcast`. The old long compile was stopped before
+this attempt, so it will not contaminate inference timings if the numerical gate passes.
+[FP32 equivalence](measurements/strix-halo-matte-broadcast-equivalence.json),
+[export metadata](measurements/strix-halo-matte-broadcast-export.json),
+[ONNX CPU comparison](measurements/strix-halo-matte-broadcast-onnx-cpu.json).
+Whole-stage NPU execution and performance are still unproven.
