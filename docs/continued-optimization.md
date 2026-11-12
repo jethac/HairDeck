@@ -75,8 +75,45 @@ hardware impossibility, NPU latency, or CPU fallback performance. Opset 17 was c
 The [result](measurements/strix-halo-npu-matte-export.json) records the exact error and Torch version;
 the target retains the traceback under `~/hairdeck-root/results/npu-matte-export/`.
 
-Next research steps are an equivalent export/decomposition of deformable convolution, then inspection
-of actual NPU partitions, numerical comparison and complete-stage timing. A smaller replacement matte
+### Export obstacle resolved with a fixed-shape decomposition
+
+The subsequent experimental exporter replaces the single-group deformable convolution with nine
+bilinear `GridSample` operations for a 3x3 kernel, the original modulation mask, and a 1x1 convolution
+using the reshaped learned weights. Zero padding and offset ordering are retained. This adapter lives
+only in `tools/rocm/deform_grid.py`; the production model still uses torchvision's HIP operator.
+AMD's [operator table](https://ryzenai.docs.amd.com/en/latest/ops_support.html) lists BF16 GridSample,
+but that is a reason to try compilation, not proof that this graph maps to the NPU.
+
+On example 2 at the real 1024px resolution, the full FP32 model with this decomposition differed from
+the original FP32 model by relative L2 **2.103e-7**, maximum logit difference **6.008e-5**, mean alpha
+difference **4.041e-9**, and maximum alpha difference **7.004e-6**. This is one image, not a dataset quality
+claim or a comparison against the deployed FP16 path. See [equivalence metrics](measurements/strix-halo-matte-grid-equivalence.json).
+
+The legacy exporter initially could not infer the reshaped convolution kernel. Making dimensions
+concrete for this deliberately fixed-shape export resolved that failure. The full ONNX export then
+succeeded in 9.377 s and produced an approximately 890 MiB model. Export time excludes model loading,
+the reference/decomposition comparison and its first-use convolution searches.
+[Export result](measurements/strix-halo-matte-grid-export.json).
+
+Reproduce the export in the GPU container:
+
+```bash
+python tools/rocm/export_npu_matte.py --decompose
+```
+
+The native Arch stage probe uses the single-stamp workaround, records runtime profiling/placement,
+and checks output before collecting timings. Its numerical gates are diagnostic acceptance limits,
+not an assertion that any output below them has equal downstream hair quality:
+
+```bash
+bash ~/dev/ryzen-ai-arch/scripts/run-sdk.sh \
+  ~/hairdeck-npu/native/runtime/opt/amd/ryzenai/1.9.0 \
+  ~/hairdeck-npu/native/venv/bin/python \
+  ~/dev/HairDeck/tools/rocm/run_npu_stage.py \
+  --root ~/hairdeck-root/results/npu-matte-grid
+```
+
+Next research steps are inspection of actual NPU partitions, numerical comparison and complete-stage timing. A smaller replacement matte
 or segmentation model is another route, but would require suitable weights and a quality comparison on
 real inputs; none was substituted here. Whole-stage NPU latency, GPU/NPU overlap, transfer cost, contention
 and power remain unmeasured. The working native Arch runtime is preserved and production uses ROCm.
