@@ -285,3 +285,10 @@ The export and ONNX CPU comparison passed. The native NPU attempt uses the separ
 [export configuration](measurements/strix-halo-matte-production-export.json),
 [CPU and original FP16-alpha comparisons](measurements/strix-halo-matte-production-onnx-cpu.json).
 Whole-stage NPU execution and performance remain unproven.
+
+`python tools/rocm/bench_matte_stage.py` measures the actual preset's GPU stage from already-composited
+CPU RGB through upload, normalization, resizing, FP16 inference and sigmoid, to working-size CPU alpha.
+On example 2 its ten warm observations had median **140.263 ms** and p90 **140.519 ms**. Image loading,
+compositing, SAM3, mask combination and model loading are excluded. The native NPU compiler was active
+during collection, so this is a **provisional baseline**, not an uncontended GPU/NPU comparison; repeat
+under matched load before claiming acceleration. [Raw observations](measurements/strix-halo-matte-production-gpu-provisional.json).

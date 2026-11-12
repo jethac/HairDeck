@@ -1,0 +1,38 @@
+{
+  "torch": "2.13.0+git733fca1",
+  "hip": "7.2.53211",
+  "preset": "best",
+  "image": "ex02.png",
+  "input_shape": [
+    768,
+    768,
+    3
+  ],
+  "output_shape": [
+    768,
+    768
+  ],
+  "model_size": 768,
+  "dtype": "float16",
+  "boundary": "CPU composited RGB -> upload/normalize/resize -> GPU model/sigmoid -> original-size GPU alpha -> working-size CPU alpha",
+  "excluded": [
+    "model loading",
+    "image loading/compositing",
+    "SAM3",
+    "mask recipe"
+  ],
+  "samples_ms": [
+    140.5565890017897,
+    140.47120299073867,
+    139.48876998620108,
+    140.4142650135327,
+    140.31433901982382,
+    140.51502099027857,
+    140.10813701315783,
+    140.21156300441362,
+    140.19145298516378,
+    139.93983398540877
+  ],
+  "median_ms": 140.26295101211872,
+  "p90_ms": 140.51917779142968
+}
