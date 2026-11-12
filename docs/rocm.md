@@ -130,3 +130,17 @@ Tried and not adopted:
 - **Forcing the GPU's DPM level to `high`**: no change; under load the 8060S already runs at 2.3-2.9 GHz.
 - **Compiling BiRefNet**: 270 to 210 ms per image, for 56 s of compilation and up to 0.05 alpha difference (fp16
   reassociation) in a once-per-image step. Left eager.
+
+## Repeated-image cache (2026-11-12)
+
+ROCm pipelines retain one image's preprocessing result and one crop's DINO features. This avoids rerunning SAM3 and
+BiRefNet when changing seeds and shares DINO features between colors and variations. The cache is bounded to one
+entry per pipeline; image pixels (including alpha) determine reuse. Per-call custom preprocessing bypasses the mask
+cache. Offloading and ZeroGPU disable caching. Set `HAIRDECK_IMAGE_CACHE=0` to disable it, or call
+`Pipeline.clear_image_cache()` after changing weights or preprocessing settings on an existing pipeline.
+
+Measured with `python tools/rocm/bench_image_cache.py`, example ex01, 50 steps, colors, chains and GLB export:
+uncached warm request 1.850 s; first cached request 1.796 s; repeated image 0.685 s. Preprocessing fell from 1.066 s
+to 0.002 s. Card tokens, colored-card JSON and chain JSON for the same seed were identical. These are single-run
+measurements on the deployed Strix Halo, not a broad throughput benchmark. The generation subtotal now excludes color
+time, which was previously also counted in that subtotal; total wall time was unaffected by that reporting error.

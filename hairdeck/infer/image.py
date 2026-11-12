@@ -26,6 +26,8 @@ Each run writes out_dir/: input.png, prep.png (preprocessing panel), model_input
 their colours), tokens_seed<s>.npy (raw card tokens), chains_seed<s>.json, hair_seed<s>[_nohead][_chains].glb,
 info.json.
 """
+import copy
+import hashlib
 import json
 import os
 import time
@@ -184,7 +186,41 @@ class Pipeline:
         self.residency.register('generation', self.enc, self.model, self.vae.vae.model, self.color, self.chain)
         if not ZERO_GPU:  # ZeroGPU: models are placed on cuda while no real GPU is attached (CUDA emulation)
             dev.sync(self.dev)
+        self.cache_enabled = os.environ.get('HAIRDECK_IMAGE_CACHE', '1' if torch.version.hip else '0') == '1'
+        self.clear_image_cache()
         self.load_sec = round(time.time() - t0, 1)
+
+    def clear_image_cache(self):
+        """Release the last image's CPU masks and GPU features; call after changing model/preprocessor settings."""
+        self._prep_cache = None
+        self._feature_cache = None
+
+    def _use_image_cache(self):
+        return self.cache_enabled and not self.residency.enabled and not ZERO_GPU
+
+    @staticmethod
+    def _pixels_key(*arrays):
+        h = hashlib.sha256()
+        for a in arrays:
+            if a is None:
+                h.update(b'none')
+            else:
+                h.update(str((a.shape, a.dtype.str)).encode())
+                h.update(np.ascontiguousarray(a).data)
+        return h.digest()
+
+    def image_features(self, crop):
+        """Reuse DINO tokens across colours, variations and requests. Bounded to one crop."""
+        key = self._pixels_key(crop) if self._use_image_cache() else None
+        cached = self._feature_cache
+        if key is not None and cached is not None and cached[0] == key:
+            return cached[1]
+        img = torch.from_numpy(crop.copy()).permute(2, 0, 1)[None].to(self.dev)
+        with torch.no_grad(), dev.amp(self.dev):
+            features = self.enc(img)
+        if key is not None:
+            self._feature_cache = (key, features)
+        return features
 
     # ------------------------------------------------------------ stages
     def prep(self, rgb, alpha=None, image_path=None, preprocessor=None):
@@ -207,9 +243,8 @@ class Pipeline:
     def sample(self, crop, x0, steps, cfg):
         """-> (cards, raw card tokens (1, 192, 40))"""
         self.residency.activate('generation')
-        img = torch.from_numpy(crop.copy()).permute(2, 0, 1)[None].to(self.dev)
         with torch.no_grad(), dev.amp(self.dev):
-            ctx = self.model.encode_cond(self.enc(img))
+            ctx = self.model.encode_cond(self.image_features(crop))
             x = euler_cfg(self.model, ctx, x0, steps, cfg)
         return tokens_to_cards(self.tok, x, self.vae, fix=True)[0], x
 
@@ -225,7 +260,7 @@ class Pipeline:
         self.residency.activate('generation')
         img = torch.from_numpy(crop.copy()).permute(2, 0, 1)[None].to(self.dev).float()
         with torch.no_grad(), dev.amp(self.dev):
-            return self.color.encode_ctx(self.enc(img), img, torch.from_numpy(matte)[None].to(self.dev))
+            return self.color.encode_ctx(self.image_features(crop), img, torch.from_numpy(matte)[None].to(self.dev))
 
     def card_colors(self, ctx, x, n_cards):
         """Colours of generated cards: per card (in the order of tokens_to_cards) 16 sRGB colours along it, from root to
@@ -293,7 +328,18 @@ class Pipeline:
         backend = prep or self.preprocessor
         sync()
         t0 = time.time()
-        p, crop = self.prep(rgb, alpha, src, backend)
+        if not self._use_image_cache():
+            self.clear_image_cache()
+        # Custom per-call preprocessors may be stateful; never cache their output.
+        key = (self._pixels_key(rgb, alpha), src, id(backend)) if self._use_image_cache() and prep is None else None
+        cached = self._prep_cache
+        cache_hit = key is not None and cached is not None and cached[0] == key
+        if cache_hit:
+            p, crop = copy.deepcopy(cached[1])
+        else:
+            p, crop = self.prep(rgb, alpha, src, backend)
+            if key is not None and crop is not None:
+                self._prep_cache = (key, copy.deepcopy((p, crop)))
         sync()
         T['prep'] = time.time() - t0
         notes = list(p['notes']) + ([size_note] if size_note else [])
@@ -307,7 +353,7 @@ class Pipeline:
         vis = prep_panel(p, crop)
         res = dict(ok=False, message='', prep_vis=vis, model_input=Image.fromarray(crop) if crop is not None else None,
                    samples=[], timings=T, out_dir=out_dir, status=p['status'], notes=notes, box=p['box'],
-                   hair_color=col, prep_backend=p['backend'], prep_info=p['info'],
+                   hair_color=col, prep_backend=p['backend'], prep_info=p['info'], cache=dict(prep_hit=cache_hit),
                    params=dict(seed=int(seed), steps=int(steps), cfg=float(cfg), n_samples=int(n_samples),
                                chains=bool(chains), colors=bool(colors)))
         if write:
@@ -344,6 +390,7 @@ class Pipeline:
             cards, tokens = self.sample(crop, x, int(steps), float(cfg))
             sync()
             t1 = time.time()
+            sample_sec = t1 - t0
             card_srgb = None
             if cctx is not None and cards:
                 try:
@@ -390,7 +437,7 @@ class Pipeline:
                     if f not in written and os.path.exists(f):  # of an earlier run of this seed, e.g. chains before --no-chains
                         os.remove(f)
             smp['chains'] = chains
-            T['dino+dit+decode'] += t1 - t0
+            T['dino+dit+decode'] += sample_sec
             if want_chains:
                 T['chains'] += t2 - t1
             T['glb'] += time.time() - t2
