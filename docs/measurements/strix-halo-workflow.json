@@ -1,0 +1,207 @@
+{
+  "python": "3.12.15",
+  "torch": "2.13.0+git733fca1",
+  "rocm": "7.2.53211",
+  "device": "AMD Radeon 8060S Graphics",
+  "startup_seconds": 17.548066306000692,
+  "pipeline_load_seconds": 16.5,
+  "disk_caches": "retained",
+  "rows": [
+    {
+      "label": "first_request",
+      "image": 1,
+      "variations": 1,
+      "ok": true,
+      "timings": {
+        "prep": 1.887,
+        "dino+dit+decode": 4.277,
+        "colors": 0.127,
+        "chains": 1.638,
+        "glb": 0.148,
+        "total": 8.209
+      },
+      "cache": {
+        "prep_hit": false
+      },
+      "notes": [
+        "input_alpha"
+      ],
+      "samples": [
+        {
+          "seed": 1,
+          "n_cards": 94,
+          "n_chains": 24,
+          "colors": true
+        }
+      ],
+      "gpu_allocated_gib": 6.879512786865234,
+      "gpu_peak_allocated_gib": 8.17028522491455
+    },
+    {
+      "label": "repeat_image",
+      "image": 1,
+      "variations": 1,
+      "ok": true,
+      "timings": {
+        "prep": 0.003,
+        "dino+dit+decode": 0.319,
+        "colors": 0.021,
+        "chains": 0.086,
+        "glb": 0.15,
+        "total": 0.719
+      },
+      "cache": {
+        "prep_hit": true
+      },
+      "notes": [
+        "input_alpha"
+      ],
+      "samples": [
+        {
+          "seed": 1,
+          "n_cards": 94,
+          "n_chains": 24,
+          "colors": true
+        }
+      ],
+      "gpu_allocated_gib": 6.879512786865234,
+      "gpu_peak_allocated_gib": 8.17028522491455
+    },
+    {
+      "label": "new_image",
+      "image": 2,
+      "variations": 1,
+      "ok": true,
+      "timings": {
+        "prep": 1.048,
+        "dino+dit+decode": 0.331,
+        "colors": 0.064,
+        "chains": 0.086,
+        "glb": 0.124,
+        "total": 1.794
+      },
+      "cache": {
+        "prep_hit": false
+      },
+      "notes": [
+        "input_alpha"
+      ],
+      "samples": [
+        {
+          "seed": 1,
+          "n_cards": 116,
+          "n_chains": 17,
+          "colors": true
+        }
+      ],
+      "gpu_allocated_gib": 6.879817962646484,
+      "gpu_peak_allocated_gib": 8.612643241882324
+    },
+    {
+      "label": "repeat_second_image",
+      "image": 2,
+      "variations": 1,
+      "ok": true,
+      "timings": {
+        "prep": 0.001,
+        "dino+dit+decode": 0.322,
+        "colors": 0.02,
+        "chains": 0.086,
+        "glb": 0.122,
+        "total": 0.69
+      },
+      "cache": {
+        "prep_hit": true
+      },
+      "notes": [
+        "input_alpha"
+      ],
+      "samples": [
+        {
+          "seed": 1,
+          "n_cards": 116,
+          "n_chains": 17,
+          "colors": true
+        }
+      ],
+      "gpu_allocated_gib": 6.879817962646484,
+      "gpu_peak_allocated_gib": 8.612643241882324
+    },
+    {
+      "label": "four_variations",
+      "image": 2,
+      "variations": 4,
+      "ok": true,
+      "timings": {
+        "prep": 0.001,
+        "dino+dit+decode": 1.294,
+        "colors": 0.071,
+        "chains": 0.345,
+        "glb": 0.469,
+        "total": 2.318
+      },
+      "cache": {
+        "prep_hit": true
+      },
+      "notes": [
+        "input_alpha"
+      ],
+      "samples": [
+        {
+          "seed": 1,
+          "n_cards": 116,
+          "n_chains": 17,
+          "colors": true
+        },
+        {
+          "seed": 2,
+          "n_cards": 91,
+          "n_chains": 11,
+          "colors": true
+        },
+        {
+          "seed": 3,
+          "n_cards": 116,
+          "n_chains": 18,
+          "colors": true
+        },
+        {
+          "seed": 4,
+          "n_cards": 116,
+          "n_chains": 18,
+          "colors": true
+        }
+      ],
+      "gpu_allocated_gib": 6.879817962646484,
+      "gpu_peak_allocated_gib": 8.612643241882324
+    },
+    {
+      "label": "new_third_image",
+      "image": 3,
+      "variations": 1,
+      "ok": true,
+      "timings": {
+        "prep": 1.035,
+        "dino+dit+decode": 0.338,
+        "colors": 0.075,
+        "chains": 0.088,
+        "glb": 0.174,
+        "total": 1.815
+      },
+      "cache": {
+        "prep_hit": false
+      },
+      "notes": [],
+      "samples": [
+        {
+          "seed": 1,
+          "n_cards": 145,
+          "n_chains": 31,
+          "colors": true
+        }
+      ],
+      "gpu_allocated_gib": 6.879512786865234,
+      "gpu_peak_allocated_gib": 8.612948417663574
+    }
+  ]
+}

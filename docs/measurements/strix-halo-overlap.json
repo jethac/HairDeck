@@ -1,0 +1,322 @@
+{
+  "root": "/workspace/hairdeck-root/results/overlap-p77xzenp",
+  "isolated_generation": {
+    "wall_seconds": 2.349217551003676,
+    "timings": {
+      "prep": 0.002,
+      "dino+dit+decode": 1.311,
+      "colors": 0.07,
+      "chains": 0.344,
+      "glb": 0.494,
+      "total": 2.349
+    }
+  },
+  "isolated_preview": {
+    "wall_seconds": 2.968882903995109,
+    "result": {
+      "out": "/workspace/hairdeck-root/results/overlap-p77xzenp/isolated-preview/turn_seed1.mp4",
+      "frames": 90,
+      "fps": 30,
+      "seconds": 3.0,
+      "n_cards": 94,
+      "n_chains": 24,
+      "cards_on_chains": 90,
+      "bind_mismatch_rigid": 0,
+      "chain_info": [
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 2,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 2,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 2,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        }
+      ],
+      "collider_pushes": 0,
+      "max_motion_cm": 48.79,
+      "mean_motion_cm": 3.862,
+      "meters_per_head_unit": 1.7057329698799537,
+      "face_width_m": 0.21764852106570676,
+      "sec": {
+        "sim": 0.62,
+        "render": 1.3,
+        "encode": 0.04,
+        "total": 2.5
+      },
+      "wall_sec": 2.97,
+      "inputs_sha256": "50b4be08771f45792bc3c9375c75d18ab7f4e32785635a309dae242dd0cd160e"
+    }
+  },
+  "overlapped_generation": {
+    "wall_seconds": 2.471867991000181,
+    "timings": {
+      "prep": 0.002,
+      "dino+dit+decode": 1.402,
+      "colors": 0.073,
+      "chains": 0.345,
+      "glb": 0.521,
+      "total": 2.472
+    }
+  },
+  "overlapped_preview": {
+    "wall_seconds": 2.9605858310096664,
+    "result": {
+      "out": "/workspace/hairdeck-root/results/overlap-p77xzenp/overlapped-preview/turn_seed1.mp4",
+      "frames": 90,
+      "fps": 30,
+      "seconds": 3.0,
+      "n_cards": 94,
+      "n_chains": 24,
+      "cards_on_chains": 90,
+      "bind_mismatch_rigid": 0,
+      "chain_info": [
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 2,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 2,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 2,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 3,
+          "rigid_bones": 0,
+          "pushes": 0
+        },
+        {
+          "joints": 5,
+          "rigid_bones": 0,
+          "pushes": 0
+        }
+      ],
+      "collider_pushes": 0,
+      "max_motion_cm": 48.79,
+      "mean_motion_cm": 3.862,
+      "meters_per_head_unit": 1.7057329698799537,
+      "face_width_m": 0.21764852106570676,
+      "sec": {
+        "sim": 0.64,
+        "render": 1.27,
+        "encode": 0.04,
+        "total": 2.49
+      },
+      "wall_sec": 2.96,
+      "inputs_sha256": "50b4be08771f45792bc3c9375c75d18ab7f4e32785635a309dae242dd0cd160e"
+    }
+  },
+  "overlapped_pair_seconds": 2.9627948959969217
+}

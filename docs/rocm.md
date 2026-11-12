@@ -176,6 +176,27 @@ render/stream time was 1.23 s and encoder flush 0.05 s. Encoding overlaps render
 CPU time. A diagnostic sent the same rendered frames through both paths and confirmed identical decoded RGB video
 hashes. Separate rendering runs are not bitwise deterministic and are unsuitable for testing encoding equivalence.
 
-The target also exposes its NPU (`amdxdna`, `/dev/accel/accel0`). AMD's Linux Ryzen AI documentation now describes
-CNN INT8/BF16 and encoder NLP BF16 compilation: https://ryzenai.docs.amd.com/en/latest/linux.html . NPU use remains
-unimplemented: operator coverage, model conversion, precision effects and end-to-end benefit must be established.
+The target also exposes its NPU (`amdxdna`, `/dev/accel/accel0`). A native Arch runtime now executes AMD's vendor
+model with output identical to CPU on a seeded diagnostic input. HairDeck's isolated BF16 MLP probe instead produces
+incorrect output on both XRT 2.27 and SDK-matched 2.26. NPU offload is therefore not enabled. See
+[the hardware investigation](strix-halo-investigation.md) and [the Arch fork](https://github.com/jethac/ryzen-ai-arch).
+
+## Deployed workflow measurements
+
+`python tools/rocm/bench_workflow.py` runs a fresh process with existing compiler/MIOpen disk caches. On 2026-11-12,
+startup including imports and model loading took 17.55 s, followed by an 8.21 s first request. This is process-cold,
+not an empty-cache installation; initial compiler/search costs are described above. The resident demo warms up
+before opening its HTTP listener.
+
+| Request after first use | Total wall time |
+|---|---:|
+| New image, example 2 | 1.794 s |
+| New image, example 3 | 1.815 s |
+| Repeat example 1 | 0.719 s |
+| Repeat example 2 | 0.690 s |
+| Four variations of cached example 2 | 2.318 s |
+
+All requests use 50 steps, CFG 2, colors, chains and GLB output. Every variation produced colors and chains.
+These are individual observations, not percentile estimates. GPU tensor allocation settled at 6.88 GiB and peaked
+at 8.61 GiB in this process; allocator reservations and other processes are not included. The live demo was resident
+but idle. Raw stage timings, versions and output counts are in [the measurement artifact](measurements/strix-halo-workflow.json).

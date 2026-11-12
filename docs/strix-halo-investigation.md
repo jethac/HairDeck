@@ -11,14 +11,14 @@ add hardware exploration. Experiments stay separate from the working default unt
   latency. Existing driver/device: amdxdna and /dev/accel/accel0. AMD's current Linux Ryzen AI docs support BF16 CNN and
   encoder models. Native Arch runtime and vendor quicktest now work; the HairDeck BF16 probe below is incorrect.
   Avoid equating advertised TOPS with benefit.
-- How does shared LPDDR5X constrain concurrency? Compare isolated stages and overlapping CPU/GPU work, and record
-  memory use, frequencies and latency. Unified physical memory does not by itself establish zero-copy tensor access.
+- Does overlapping actual generation and preview work help on this APU? The experiment below measures this directly.
+  Unified physical memory does not by itself establish zero-copy tensor access or memory-bandwidth saturation.
 - Why does restructuring small diffusion GEMMs help this APU? Keep original, eager optimized and compiled timings,
   dimensions and bandwidth reasoning. Existing measurements already reject forced clocks, HIP graphs and TunableOp.
 - What changes improve responsiveness without changing inference quality? Image caching and video frame streaming
   are implemented. Separate cold startup, first-use compilation, new images, repeated images and multiple variations.
 
-## Latest evidence and unfinished work
+## Deployment and measured decisions
 
 - Live demo serves HTTP 200 with image caching and streamed preview encoding. It now runs as a foreground Compose
   service with `restart: unless-stopped`; Docker is enabled at boot. Real API acceptance generated two variations,
@@ -28,9 +28,8 @@ add hardware exploration. Experiments stay separate from the working default unt
   0.10 s validation. Export passed its real VRM validator; Blender serialization accounts for 3.76 s.
 - SAM3 compilation trials are documented in rocm.md, not enabled in the demo.
 - The --bf16-linears probe failed: SAM3's decoder forward_ffn deliberately uses float32 input outside autocast, so
-  converting every Linear to BF16 breaks dtype compatibility. No production model was changed. Next experiment can
-  restrict conversion to the vision backbone or explicitly preserve FP32-only modules; do not silently cast the
-  decoder's float32 path just to force the trial through.
+  converting every Linear to BF16 breaks dtype compatibility. No production model was changed. The probe also
+  supports `--bf16-vision` for limiting conversion to the backbone; full-model conversion is rejected.
 - Preview streaming matched decoded video hashes when both encoders received exactly the same rendered RGB frames.
   Separate scene rendering runs differed; do not attribute that difference to encoding without isolating the source.
 
@@ -68,3 +67,20 @@ the same error with both `--layout auto` and `--layout vectorized`. `/proc/self/
 and XDNA shim libraries all loaded from the private 2.26 directory. The newer 2.27 userspace version and the layout
 choice therefore do not explain this failure. No kernel driver was replaced. The underlying compiler/runtime
 defect remains unresolved; the NPU MLP path is rejected for deployment. The working ROCm path is unaffected.
+
+## Concurrent preview and generation
+
+`python tools/rocm/bench_overlap.py` measures four cached-image variations and a separate 90-frame motion preview,
+first alone and then together. The preview runs CPU spring simulation, GPU OpenGL rendering and CPU ffmpeg encoding;
+generation runs the real ROCm models, colors, chains and GLB output. Fresh output directories bypass preview caching.
+
+In the recorded pair, generation alone took 2.349 s and preview alone 2.969 s (5.318 s combined serial time).
+Overlapping them completed both in 2.963 s; generation took 2.472 s and preview 2.961 s. This shows useful overlap
+for this workload with a small generation latency increase. It does not establish raw LPDDR5X bandwidth, general
+scaling, or NPU/GPU overlap. One pair is a diagnostic, not a statistical throughput claim. The demo already permits
+independent preview and generation jobs, so no additional scheduling change was needed. Raw results are retained in
+[strix-halo-overlap.json](measurements/strix-halo-overlap.json).
+
+The deployed workflow's process-cold, new-image, repeat-image and multi-variation timings are in
+[rocm.md](rocm.md#deployed-workflow-measurements), with a runnable probe and raw measurements. The remaining NPU BF16
+compiler/runtime defect is a separate research lead, not an enabled optimization or a prerequisite for GPU operation.
