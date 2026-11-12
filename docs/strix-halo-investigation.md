@@ -34,3 +34,24 @@ add hardware exploration. Experiments stay separate from the working default unt
 For each experiment record the hypothesis, exact commands/revisions, cold/warm state, actual hardware/runtime,
 output-quality comparison, measurements and conclusion. Include failed and neutral results; do not fabricate a
 positive result or extrapolate isolated-stage wins into end-to-end claims. This is source material, not a blog draft.
+
+## HairDeck MLP NPU experiment: incorrect output, not deployable
+
+`tools/rocm/bench_npu_mlp.py` exports actual `blocks.0.mlp` weights from the released image model. Inputs are synthetic
+standard-normal activations, seed 42, shape (2,192,768); the MLP expands to 3072 channels and uses tanh GELU.
+This is an isolated hardware/compiler probe, not an end-to-end HairDeck benchmark or quality acceptance.
+
+On native Arch/XRT 2.27/Ryzen AI 1.9, the BF16 VitisAI compiler placed the graph on the NPU. Median MLP inference was
+8.31 ms with 0.813 relative L2 error, versus the ROCm GPU's 0.239 ms compiled and 0.00226 relative L2 against CPU FP32.
+The GPU measurement includes synchronization but resident inputs; the NPU ORT run includes its host interface. The
+paths are not comparable as raw kernel throughput, and the NPU result is numerically invalid regardless of speed.
+
+CPU ONNX matches CPU PyTorch (relative L2 1.69e-7), ruling out the export as the source of the large error. Flattening
+the input to (384,768) preserves the same NPU error. Isolating just the first Linear (`--linear --flat`) gives 1.41 ms
+and 0.708 relative L2 error. Exactly half the output channels are zero: columns 0..1535 have roughly 0.0094 relative
+L2 error, while columns 1536..3071 are all zero. NPU placement was confirmed in the compiler log. Root cause remains
+open: investigate output-channel tiling and the newer XRT/runtime combination before attributing this to hardware.
+The probe saves reference tensors, ONNX, output tensors and metrics in its specified --root for a reproducer.
+
+Native Python's executable is copied into the venv rather than symlinked; locating libpython via readlink was wrong.
+The Arch fork's run-sdk.sh now asks sysconfig for LIBDIR. This resolved the BF16 runtime's missing-libpython error.
