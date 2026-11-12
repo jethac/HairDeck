@@ -201,3 +201,33 @@ NPU evidence. Retaining the real attention module and weights preserves the fail
 The original, larger decomposition compile remains a separate running experiment; do not treat the
 compact model's failure as its result. Further work should use the attention reduction to investigate
 tiling before paying another full-model compilation cost.
+
+### Equivalent attention layout compiles on the NPU
+
+`export_matte_attention.py --flat-heads` folds windows and heads into one batched-matmul dimension.
+It preserves all windows, heads, learned weights, relative position bias and masks. On the captured
+`[36,144,384]` attention input, the FP32 result was identical to the original module (relative L2 zero).
+The NPU compile then succeeded: 19 VAIML operators, one subgraph actually running on NPU, and relative
+L2 **0.011146** against FP32, below the diagnostic 0.02 gate. Session creation was 8.778 s with the original
+large compilation still running, so it is not an uncontended performance benchmark.
+[Export metadata](measurements/strix-halo-matte-attention-flat-export.json),
+[native validation](measurements/strix-halo-matte-attention-flat-npu.json).
+
+This avoids the buffer mismatch by changing the compiler-visible layout without changing the model's
+attention operation. It is an export workaround, not a patch to AMD's tiler. It does not establish that
+all shapes or an entire model now compile correctly.
+
+The combined full-model export applies this attention layout to every Swin attention module, and uses
+compact sampling with the improved coordinate formulation:
+
+```bash
+python tools/rocm/export_npu_matte.py --flat-heads --stable-coordinates
+```
+
+Against the unchanged full FP32 BiRefNet on example 2, relative L2 was **3.623e-7**, mean alpha difference
+**1.034e-8**, and maximum alpha difference **1.013e-5**. It exported successfully and passed the separate
+ONNX CPU check before a new native NPU compilation was started with `--validate-only`.
+[Full-model equivalence](measurements/strix-halo-matte-reformulated-equivalence.json),
+[export metadata](measurements/strix-halo-matte-reformulated-export.json).
+Its artifacts live under `npu-matte-grid-compact-flat-stable`; whole-stage NPU correctness and latency
+remain pending.
