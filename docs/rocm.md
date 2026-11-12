@@ -34,6 +34,22 @@ What the image contains:
 | Python deps | `requirements-rocm.txt` (= `requirements.txt` without torch/torchvision) | installed into the image Python with `docker/rocm-constraints.txt` pinning the ROCm torch / torchvision / triton. In a venv, uv resolves a CUDA torch from PyPI instead |
 | torchvision | 0.28.0 at the base image's commit, rebuilt with HIP kernels (`docker/build-torchvision.sh`) | the base image's torchvision has CPU-only ops: `torchvision::deform_conv2d` (BiRefNet-matting's decoder), `nms` and `roi_align` (SAM 3) fail on the GPU with `Could not run 'torchvision::...' with arguments from the 'CUDA' backend` |
 
+### Persistent demo
+
+Once weights and assets are installed, stop the setup container and use the Compose service. It runs the demo as
+the container's foreground process and restarts after a crash or Docker/host restart. Docker itself must be enabled
+at boot. It warms the pipeline before serving; inspect startup with `docker compose -f docker/compose.rocm.yml logs -f`.
+
+```bash
+export RENDER_GID=$(getent group render | cut -d: -f3)
+export VIDEO_GID=$(getent group video | cut -d: -f3)
+# Optional: HAIRDECK_IMAGE, HAIRDECK_DATA, HAIRDECK_HF_CACHE override the image and host directories.
+docker compose -f docker/compose.rocm.yml up -d
+```
+
+`GRADIO_SERVER_NAME=0.0.0.0` binds inside the container; the published host port remains loopback-only. Use
+`tailscale serve --bg --http=7860 http://127.0.0.1:7860` for tailnet access. The default standalone app binds localhost.
+
 Check the environment: `python tools/rocm/smoke.py` prints the GPU, a bf16 attention result, the torchvision GPU ops
 and the EGL renderer string, which should read `AMD Radeon 8060S Graphics (radeonsi, strix_halo, ACO, ...)`.
 

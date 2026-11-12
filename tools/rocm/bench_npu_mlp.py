@@ -13,6 +13,8 @@ p.add_argument('--weights')
 p.add_argument('--flat', action='store_true')
 p.add_argument('--compile', action='store_true')
 p.add_argument('--linear', action='store_true')
+p.add_argument('--width',type=int,default=0)
+p.add_argument('--layout',choices=['auto','unvectorized','vectorized'],default='unvectorized')
 a=p.parse_args()
 root=Path(a.root); root.mkdir(parents=True,exist_ok=True)
 if a.mode in ('export','gpu'):
@@ -23,7 +25,12 @@ if a.mode in ('export','gpu'):
     model=torch.nn.Sequential(torch.nn.Linear(dim,hidden),torch.nn.GELU(approximate='tanh'),torch.nn.Linear(hidden,dim)).eval()
     model.load_state_dict({k.removeprefix('blocks.0.mlp.'):v for k,v in sd.items() if k.startswith('blocks.0.mlp.')})
     del sd
-    if a.linear: model=model[0]
+    if a.linear:
+        model=model[0]
+        if a.width:
+            model.weight=torch.nn.Parameter(model.weight[:a.width].clone())
+            model.bias=torch.nn.Parameter(model.bias[:a.width].clone())
+            model.out_features=a.width
     if a.mode=='export':
         torch.manual_seed(42)
         x=torch.randn(2,192,dim)
@@ -40,11 +47,11 @@ if a.mode in ('export','gpu'):
     sync=torch.cuda.synchronize
 else:
     import onnxruntime as ort
-    config={'passes':[{'name':'init','plugin':'vaip-pass_init'}, {'name':'vaiml_partition','plugin':'vaip-pass_vaiml_partition','vaiml_config':{'optimize_level':1,'preferred_data_storage':'unvectorized'}}], 'target':'VAIML','targets':[{'name':'VAIML','pass':['init','vaiml_partition']}]}
+    config={'passes':[{'name':'init','plugin':'vaip-pass_init'}, {'name':'vaiml_partition','plugin':'vaip-pass_vaiml_partition','vaiml_config':{'optimize_level':1,'preferred_data_storage':a.layout}}], 'target':'VAIML','targets':[{'name':'VAIML','pass':['init','vaiml_partition']}]}
     (root/'bf16.json').write_text(json.dumps(config))
     opts=ort.SessionOptions(); opts.log_severity_level=1
     start=time.perf_counter()
-    session=ort.InferenceSession(str(root/'mlp.onnx'),sess_options=opts,providers=['VitisAIExecutionProvider'],provider_options=[{'config_file':str(root/'bf16.json'),'cache_dir':str(root/'cache'),'enable_cache_file_io_in_mem':'0'}])
+    session=ort.InferenceSession(str(root/'mlp.onnx'),sess_options=opts,providers=['VitisAIExecutionProvider'],provider_options=[{'config_file':str(root/'bf16.json'),'cache_dir':str(root/('cache-'+a.layout)),'enable_cache_file_io_in_mem':'0'}])
     print('session_seconds',time.perf_counter()-start,flush=True)
     assert 'VitisAIExecutionProvider' in session.get_providers(), 'CPU-only fallback'
     data=np.load(root/'reference.npz')

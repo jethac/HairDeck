@@ -9,7 +9,8 @@ add hardware exploration. Experiments stay separate from the working default unt
 - Can an independent preprocessing stage (for example matting) run on the XDNA2 NPU concurrently with GPU SAM3?
   First establish runtime availability, operator coverage and model conversion, then compare quality and end-to-end
   latency. Existing driver/device: amdxdna and /dev/accel/accel0. AMD's current Linux Ryzen AI docs support BF16 CNN and
-  encoder models. The host's runtime installation is not yet established. Avoid equating advertised TOPS with benefit.
+  encoder models. Native Arch runtime and vendor quicktest now work; the HairDeck BF16 probe below is incorrect.
+  Avoid equating advertised TOPS with benefit.
 - How does shared LPDDR5X constrain concurrency? Compare isolated stages and overlapping CPU/GPU work, and record
   memory use, frequencies and latency. Unified physical memory does not by itself establish zero-copy tensor access.
 - Why does restructuring small diffusion GEMMs help this APU? Keep original, eager optimized and compiled timings,
@@ -19,8 +20,10 @@ add hardware exploration. Experiments stay separate from the working default unt
 
 ## Latest evidence and unfinished work
 
-- Live demo serves HTTP 200 with image caching. Latest integrated commits: 86c1324 and a7a58b0 on origin/rocm.
-- Remote working tree contains the deployed source edits and probes but its HEAD still needs reconciliation with origin.
+- Live demo serves HTTP 200 with image caching and streamed preview encoding. It now runs as a foreground Compose
+  service with `restart: unless-stopped`; Docker is enabled at boot. Real API acceptance generated two variations,
+  exported a validated 13.7 MB VRM, and rendered a three-second motion preview. The old development container is
+  stopped and retained. Acceptance ran during a source build, so its timing is not a clean performance measurement.
 - VRM export through the resident Blender worker: 5.45 s total, 4.21 s Blender, 0.87 s static preview, 0.27 s prep,
   0.10 s validation. Export passed its real VRM validator; Blender serialization accounts for 3.76 s.
 - SAM3 compilation trials are documented in rocm.md, not enabled in the demo.
@@ -55,3 +58,13 @@ The probe saves reference tensors, ONNX, output tensors and metrics in its speci
 
 Native Python's executable is copied into the venv rather than symlinked; locating libpython via readlink was wrong.
 The Arch fork's run-sdk.sh now asks sysconfig for LIBDIR. This resolved the BF16 runtime's missing-libpython error.
+
+### Matched runtime comparison
+
+Reducing the isolated Linear to 768 output channels (`--linear --flat --width 768`) still gives relative L2 0.70665.
+AMD xdna-driver branch 1.9 at `a1f7a2fe`, with pinned XRT `e9db9ab15f10173f8d2fc93ff92ab4c7eb09d2e6` (2.26.0),
+built natively with `SKIP_KMOD=ON` and a private install prefix. Recompiling with fresh caches on that stack gives
+the same error with both `--layout auto` and `--layout vectorized`. `/proc/self/maps` confirmed that core, coreutil
+and XDNA shim libraries all loaded from the private 2.26 directory. The newer 2.27 userspace version and the layout
+choice therefore do not explain this failure. No kernel driver was replaced. The underlying compiler/runtime
+defect remains unresolved; the NPU MLP path is rejected for deployment. The working ROCm path is unaffected.
