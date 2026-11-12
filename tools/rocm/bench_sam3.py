@@ -35,7 +35,15 @@ def run(path, label):
     return out
 run(images[0], 'warmup')
 base = [run(path, 'eager') for path in images]
-if '--grounding' in sys.argv:
+if '--bf16-vision' in sys.argv:
+    for module in model.backbone.vision_backbone.modules():
+        if isinstance(module, torch.nn.Linear):
+            module.to(dtype=torch.bfloat16)
+elif '--bf16-linears' in sys.argv:
+    for module in model.modules():
+        if isinstance(module, torch.nn.Linear):
+            module.to(dtype=torch.bfloat16)
+elif '--grounding' in sys.argv:
     for module in (model.transformer.encoder, model.transformer.decoder, model.segmentation_head):
         module.forward = torch.compile(module.forward, mode='default')
 else:
