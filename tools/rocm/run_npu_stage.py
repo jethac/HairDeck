@@ -14,6 +14,7 @@ import onnxruntime as ort
 parser = argparse.ArgumentParser()
 parser.add_argument('--root', required=True)
 parser.add_argument('--cpu-reference', action='store_true', help='Validate exported ONNX semantics without NPU compilation')
+parser.add_argument('--validate-only', action='store_true', help='Check placement and output, defer timing during other experiments')
 args = parser.parse_args()
 root = Path(args.root)
 config = {'passes': [{'name': 'init', 'plugin': 'vaip-pass_init'},
@@ -21,7 +22,8 @@ config = {'passes': [{'name': 'init', 'plugin': 'vaip-pass_init'},
            'vaiml_config': {'optimize_level': 1, 'preferred_data_storage': 'auto', 'tp_size': 1}}],
           'target': 'VAIML', 'targets': [{'name': 'VAIML', 'pass': ['init', 'vaiml_partition']}]}
 (root/'bf16-single-stamp.json').write_text(json.dumps(config, indent=2))
-report = dict(ort=ort.__version__, tp_size=1, cpu_reference=args.cpu_reference, success=False)
+report = dict(ort=ort.__version__, tp_size=1, cpu_reference=args.cpu_reference,
+              validate_only=args.validate_only, success=False)
 tag = 'cpu-reference' if args.cpu_reference else 'npu'
 start = time.perf_counter()
 try:
@@ -65,7 +67,7 @@ try:
     if (not np.isfinite(y).all() or report['relative_l2'] > (.0001 if args.cpu_reference else .02)
             or report['alpha_mean_abs'] > .001 or report['mask_iou'] < .99):
         raise RuntimeError('Whole-stage numerical gate failed; no latency benchmark collected')
-    if args.cpu_reference:
+    if args.cpu_reference or args.validate_only:
         report['success'] = True
         (root/(tag+'-result.json')).write_text(json.dumps(report, indent=2))
         print(json.dumps(report), flush=True)

@@ -18,13 +18,18 @@ from hairdeck.prep.matte import build
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--decompose', action='store_true')
+parser.add_argument('--compact-grid', action='store_true', help='Use one GridSample per deformable convolution')
 args = parser.parse_args()
-root = Path(paths.results('npu-matte-grid' if args.decompose else 'npu-matte-export'))
+args.decompose = args.decompose or args.compact_grid
+root = Path(paths.results('npu-matte-grid-compact' if args.compact_grid else
+                         'npu-matte-grid' if args.decompose else 'npu-matte-export'))
 root.mkdir(parents=True, exist_ok=True)
 model = build('birefnet_matting', 1024, device='cuda').net
 x = torch.zeros(1, 3, 1024, 1024, device='cuda', dtype=torch.float16)
 if args.decompose:
     from deform_grid import deform_conv2d
+    if args.compact_grid:
+        from deform_grid import compact_deform_conv2d as deform_conv2d
     import torch.nn.functional as F
     model.float()
     rgb = np.asarray(Image.open(paths.data('demo_examples', 'ex02.png')).convert('RGB')).copy()
@@ -47,7 +52,8 @@ if args.decompose:
     np.savez(root/'reference.npz', x=x.cpu().numpy(), y=reference.cpu().numpy())
 start = time.perf_counter()
 result = dict(torch=torch.__version__, shape=list(x.shape), dtype=str(x.dtype),
-              decomposition=args.decompose, opset=17, exporter='legacy', success=False)
+              decomposition=args.decompose, compact_grid=args.compact_grid,
+              opset=17, exporter='legacy', success=False)
 try:
     with torch.no_grad():
         torch.onnx.export(model, (x,), str(root/'matte.onnx'), opset_version=17, dynamo=False)

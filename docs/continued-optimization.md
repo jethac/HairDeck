@@ -123,3 +123,26 @@ Next research steps are inspection of actual NPU partitions, numerical compariso
 or segmentation model is another route, but would require suitable weights and a quality comparison on
 real inputs; none was substituted here. Whole-stage NPU latency, GPU/NPU overlap, transfer cost, contention
 and power remain unmeasured. The working native Arch runtime is preserved and production uses ROCm.
+
+### Compact equivalent export
+
+The first native compile spent over 18 minutes in tiling without reaching execution. A single debugger
+snapshot showed `tilingFeasibilityCheck::checkFeasibility` and local-memory metadata calculations; its
+intermediate artifacts continued changing. It was left running, not classified as a failed compile.
+
+`python tools/rocm/export_npu_matte.py --compact-grid` packs all kernel sampling positions into one
+GridSample output per deformable convolution, then restores the original channel/kernel ordering before
+applying the learned weights. This keeps the model and sampling rule intact while reducing graph size.
+The full-model FP32 and exported ONNX CPU comparisons produced the same error metrics as the earlier
+decomposition on example 2. [PyTorch comparison](measurements/strix-halo-matte-compact-equivalence.json),
+[ONNX CPU comparison](measurements/strix-halo-matte-compact-onnx-cpu.json).
+
+Raw exported nodes decreased from 31,732 to 21,597, and GridSample nodes from 300 to 20. After the runtime's
+initial optimization, the compiler log reported 3,198 nodes instead of 8,458. These are graph counts, not
+latency improvements. [Raw operator counts](measurements/strix-halo-matte-compact-graph.json).
+The compact export took 7.210 s in this observation, excluding loading and equivalence checks;
+[export metadata](measurements/strix-halo-matte-compact-export.json).
+
+The compact model has its own `npu-matte-grid-compact` output/cache directory. Its native probe was started
+with `--validate-only` while the original compiler remained running; no uncontended latency measurement
+can be inferred from this overlapping compilation experiment. Placement and NPU correctness remain pending.
