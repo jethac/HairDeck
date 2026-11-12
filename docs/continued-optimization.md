@@ -146,3 +146,23 @@ The compact export took 7.210 s in this observation, excluding loading and equiv
 The compact model has its own `npu-matte-grid-compact` output/cache directory. Its native probe was started
 with `--validate-only` while the original compiler remained running; no uncontended latency measurement
 can be inferred from this overlapping compilation experiment. Placement and NPU correctness remain pending.
+
+### Focused real-activation layer diagnostic
+
+While both complete-model compiles ran, `python tools/rocm/export_matte_deform.py` captured the first
+deformable convolution from example 2's actual BiRefNet forward pass. This is a 1x1 learned convolution
+with nontrivial offsets/modulation, input `[1,64,32,32]` and output `[1,256,32,32]`, not a whole-stage result.
+The compact FP32 decomposition differed from torchvision by relative L2 **2.514e-7**.
+
+The native `run_npu_stage.py --feature-output --validate-only --root .../npu-matte-deform` probe compiled
+and executed it. The compiler log reported **25 VAIML operators, one NPU subgraph, one actually running
+on NPU**, and the runtime profile recorded one VitisAI execution event. Session creation took 11.616 s
+while the larger compiles were running; this is not an uncontended compilation benchmark.
+
+The layer output's relative L2 error was **0.023357**, above the probe's predeclared 0.02 gate. No latency
+benchmark was collected. This does not establish a whole-matte quality failure or another compiler
+defect: numerical effects must be evaluated on the final alpha output. The raw report's old error text
+says "Whole-stage numerical gate"; its `feature_output: true` and this captured shape identify it as a
+layer probe. The error text was subsequently made generic.
+[Captured-layer metadata](measurements/strix-halo-matte-deform-export.json),
+[native result](measurements/strix-halo-matte-deform-npu.json).

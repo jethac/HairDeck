@@ -1,0 +1,20 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": false,
+  "validate_only": true,
+  "feature_output": true,
+  "success": false,
+  "session_seconds": 11.615584546991158,
+  "providers": [
+    "VitisAIExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "relative_l2": 0.02335713990032673,
+  "profile": "/home/jethac/hairdeck-root/results/npu-matte-deform/npu-ort-profile_2026-11-13_01-24-02_535.json",
+  "profile_provider_events": {
+    "VitisAIExecutionProvider": 1
+  },
+  "error": "RuntimeError: Whole-stage numerical gate failed; no latency benchmark collected",
+  "elapsed_seconds": 11.624648486002116
+}
