@@ -1,0 +1,14 @@
+{
+  "torch": "2.13.0+git733fca1",
+  "shape": [
+    1,
+    3,
+    1024,
+    1024
+  ],
+  "opset": 17,
+  "exporter": "legacy",
+  "success": false,
+  "error": "UnsupportedOperatorError: ONNX export failed on an operator with unrecognized namespace torchvision::deform_conv2d. If you are trying to export a custom operator, make sure you registered it with the right domain and version.",
+  "seconds": 2.3214938419987448
+}

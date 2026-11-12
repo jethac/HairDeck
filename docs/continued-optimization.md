@@ -1,0 +1,82 @@
+# Continued Strix Halo optimization after the NPU workaround
+
+The NPU's corrected BF16 MLP is still slower than the compiled GPU MLP. Working arithmetic alone does not
+justify inserting it into the GPU sampler. This pass measures batching and repeated GPU work, and probes
+whether the existing independent matting stage can reach the NPU compiler.
+
+## Optional batched image variations
+
+`Pipeline.run(..., batch_variations=True)` batches the image DiT across independently seeded noise tensors.
+VAE decoding, colors, chains and file export retain their per-seed paths. Single-variation requests, model
+offload and ZeroGPU keep sequential sampling. `HAIRDECK_BATCH_VARIATIONS=1` enables it for the demo; the Compose
+file forwards this variable. It defaults to **off**, because batch shape changes floating-point rounding
+and generated output. Set the environment variable before creating/recreating the service, not just in an
+unrelated shell after it is running.
+
+Run `python tools/rocm/bench_variations.py` inside the ROCm environment. This uses example 2, seeds 1 through
+the requested count, 50 steps, CFG 2, colors, chains and GLB files. The live demo was resident but idle.
+These are individual request observations, not medians or percentiles. Disk compiler caches were retained.
+
+| Warm cached-image request | Sequential total | Batched total | Sequential sampling + decode | Batched sampling + decode |
+|---|---:|---:|---:|---:|
+| 2 variations | 1.173 s | 1.046 s | 0.648 s | 0.524 s |
+| 4 variations | 2.280 s | 1.968 s | 1.326 s | 1.017 s |
+
+The corresponding complete-request reductions are 10.8% and 13.7%. The first batch-2 request took 7.090 s,
+and the first batch-4 request 8.428 s, including shape-specific compilation/initialization. These are not
+isolated compiler times or empty-cache measurements. The initial sequential request took 8.244 s, including
+uncached preprocessing and other first-use costs; it is not a matched cold comparison.
+
+Warm peak allocated GPU tensor memory was 7.262 GiB for both two-variation paths, and 7.264 versus 7.411 GiB
+for four variations. Reserved memory is reported separately in the raw artifact and depends on preceding
+requests. These measurements exclude the separate demo process and are not total machine memory.
+
+Same-seed raw tokens were **not identical**. Relative L2 differences ranged from 0.00667 to 0.01003 at batch 2,
+and 0.00348 to 0.03766 at batch 4. Card counts stayed the same in these samples, but seed 1 changed from 17
+chains to 16 at batch 4. The seed-3 first preview frames retained the broad hairstyle with visible local
+strand/shape differences. This limited visual inspection is not a quality-equivalence evaluation.
+
+Batch-4 seed 3 also completed VRM export and validation: 116 cards, 18 chains, 13.9 MB VRM, no reported
+validation problems. The 90-frame motion preview completed. Artifacts are retained on the target under
+`~/hairdeck-root/results/variation-benchmark/`; the reference and batched seed-3 videos permit comparison
+throughout the motion rather than just the first frame.
+
+Raw results: [request timings](measurements/strix-halo-variations.json),
+[batch-2 numerics](measurements/strix-halo-variations-2-numerics.json),
+[batch-4 numerics](measurements/strix-halo-variations-4-numerics.json).
+
+## Repeated conditioning: measured, additional cache deferred
+
+`python tools/rocm/profile_conditioning.py` loads the real pipeline and the saved example-2 crop, warms each
+operation three times and records 20 synchronized wall-clock observations. This diagnostic measures the
+operations independently; its synchronization is not inserted into production requests.
+
+| Operation | Median |
+|---|---:|
+| Existing cached DINO feature lookup, including pixel hash | 0.271 ms |
+| Image-model condition projection | 0.196 ms |
+| Fast denoiser construction, including fixed KV and all-step modulation | 4.792 ms |
+
+Even eliminating these costs entirely would save only about 5.3 ms per sequential variation in this probe.
+A persistent denoiser cache would retain sizable tensors and need invalidation for image, step count,
+guidance, weights and device. We did not add it for this small measured opportunity. Batching already
+shares condition preparation within a request. [Raw samples](measurements/strix-halo-conditioning.json).
+
+## Whole-stage NPU: matting export obstacle
+
+BiRefNet is an independent preprocessing stage and a reasonable candidate for overlapping an earlier
+image's GPU generation. `python tools/rocm/export_npu_matte.py` attempted the actual 1024px model export,
+without replacing its operators. PyTorch's legacy ONNX exporter at opset 17 rejected
+`torchvision::deform_conv2d` with `UnsupportedOperatorError` after 2.32 s.
+
+This is a **frontend export failure**, before NPU partitioning or compilation. It does not establish
+hardware impossibility, NPU latency, or CPU fallback performance. Opset 17 was chosen because AMD's
+[deployment documentation](https://ryzenai.docs.amd.com/en/latest/modelrun.html) recommends it.
+The [result](measurements/strix-halo-npu-matte-export.json) records the exact error and Torch version;
+the target retains the traceback under `~/hairdeck-root/results/npu-matte-export/`.
+
+Next research steps are an equivalent export/decomposition of deformable convolution, then inspection
+of actual NPU partitions, numerical comparison and complete-stage timing. A smaller replacement matte
+or segmentation model is another route, but would require suitable weights and a quality comparison on
+real inputs; none was substituted here. Whole-stage NPU latency, GPU/NPU overlap, transfer cost, contention
+and power remain unmeasured. The working native Arch runtime is preserved and production uses ROCm.

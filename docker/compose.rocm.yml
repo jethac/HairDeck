@@ -22,6 +22,8 @@ services:
       - ${HAIRDECK_HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
     environment:
       GRADIO_SERVER_NAME: 0.0.0.0
+      # Opt-in: faster warm multi-variation requests, but changes same-seed output.
+      HAIRDECK_BATCH_VARIATIONS: ${HAIRDECK_BATCH_VARIATIONS:-0}
     command: ["exec python -u -m demo.app --port 7860"]
     logging:
       driver: json-file

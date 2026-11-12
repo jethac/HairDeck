@@ -94,9 +94,8 @@ Other checks on gfx1151:
 - VRM export and previews (`tools/rocm/make_vrm_fixture.py`, then `python -m hairdeck.vrm.export DIR 0`): Blender
   4.2 with the VRM Add-on, `hairdeck.vrm.check` passing, the rest-pose sheet and the head-turn video rendered through
   EGL on radeonsi.
-- Not run here: the image pipeline end to end (SAM 3 and DINOv3 are gated downloads). Its parts run on the paths
-  checked above: SAM 3 on flash SDPA and torchvision's HIP ops, the image DiT on the same set-DiT sampler as the
-  point-cloud and chain DiTs.
+- The gated SAM 3 and DINOv3 assets were subsequently installed and the complete image pipeline exercised,
+  including colors, chains, previews and VRM export. See the deployed workflow measurements below.
 
 ## Performance
 
@@ -202,3 +201,6 @@ All requests use 50 steps, CFG 2, colors, chains and GLB output. Every variation
 These are individual observations, not percentile estimates. GPU tensor allocation settled at 6.88 GiB and peaked
 at 8.61 GiB in this process; allocator reservations and other processes are not included. The live demo was resident
 but idle. Raw stage timings, versions and output counts are in [the measurement artifact](measurements/strix-halo-workflow.json).
+
+Later [batched-variation measurements and NPU export investigation](continued-optimization.md) cover the optional
+`HAIRDECK_BATCH_VARIATIONS=1` mode. It remains off by default because same-seed output changes.

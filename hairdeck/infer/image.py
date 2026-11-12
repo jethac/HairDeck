@@ -248,6 +248,16 @@ class Pipeline:
             x = euler_cfg(self.model, ctx, x0, steps, cfg)
         return tokens_to_cards(self.tok, x, self.vae, fix=True)[0], x
 
+    def sample_variations(self, crop, noises, steps, cfg):
+        """Sample seeds together; retain single-sample VAE decoding and per-seed token shapes."""
+        self.residency.activate('generation')
+        with torch.no_grad(), dev.amp(self.dev):
+            ctx = self.model.encode_cond(self.image_features(crop))
+            ctx = ctx.expand(len(noises), -1, -1).contiguous()
+            x = euler_cfg(self.model, ctx, torch.cat(noises, dim=0), steps, cfg)
+        return [(tokens_to_cards(self.tok, row, self.vae, fix=True)[0], row)
+                for row in x.split(1, dim=0)]
+
     def matte_crop(self, p):
         """The person matte of a preprocessing result cut to the model input (bool (res, res)); an empty one: all true
         (as prep keeps the whole image for an empty matte)."""
@@ -317,10 +327,12 @@ class Pipeline:
 
     @managed_request
     def run(self, image, seed=0, steps=50, cfg=2.0, n_samples=1, out_dir=None, x0=None, write=True, chains=True, prep=None,
-            colors=True):
+            colors=True, batch_variations=None):
         """image: path, PIL image or (H, W, 3|4) uint8 array; n_samples variations with the seeds seed, seed + 1, ... (at
         most 4); out_dir (default <out_root>/<time>_<id>) gets the files listed in the module docstring;
-        prep: another preprocessor for this call; colors False: one hair colour instead of the colour model's"""
+        prep: another preprocessor for this call; colors False: one hair colour instead of the colour model's;
+        batch_variations: opt-in batched sampling (default HAIRDECK_BATCH_VARIATIONS=0), changes same-seed results.
+        Disabled with model offload / ZeroGPU. First use of each batch shape may compile."""
         T = {}
         sync = lambda: dev.sync(self.dev)
         t_all = time.time()
@@ -383,14 +395,30 @@ class Pipeline:
         if want_chains:
             T['chains'] = 0.0
         T['glb'] = 0.0
+        # Explicit opt-in: batching changes GEMM rounding and may change the sampled hairstyle.
+        batch_requested = (os.environ.get('HAIRDECK_BATCH_VARIATIONS', '0') == '1'
+                           if batch_variations is None else bool(batch_variations))
+        batched = None
+        res['params']['batch_variations'] = bool(batch_requested and len(seeds) > 1
+                                                and not self.residency.enabled and not ZERO_GPU)
+        if res['params']['batch_variations']:
+            sync()
+            t0 = time.time()
+            noises = [x0 if x0 is not None and k == 0 else self.noise(s) for k, s in enumerate(seeds)]
+            batched = self.sample_variations(crop, noises, int(steps), float(cfg))
+            sync()
+            T['dino+dit+decode'] = time.time() - t0
         for k, s in enumerate(seeds):
             sync()
             t0 = time.time()
-            x = (x0 if (x0 is not None and k == 0) else self.noise(s))
-            cards, tokens = self.sample(crop, x, int(steps), float(cfg))
+            if batched is None:
+                x = (x0 if (x0 is not None and k == 0) else self.noise(s))
+                cards, tokens = self.sample(crop, x, int(steps), float(cfg))
+            else:
+                cards, tokens = batched[k]
             sync()
             t1 = time.time()
-            sample_sec = t1 - t0
+            sample_sec = t1 - t0 if batched is None else 0.0
             card_srgb = None
             if cctx is not None and cards:
                 try:
