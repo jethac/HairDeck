@@ -35,7 +35,7 @@ def deform_conv2d(input, offset, weight, bias=None, stride=(1, 1), padding=(0, 0
 
 
 def compact_deform_conv2d(input, offset, weight, bias=None, stride=(1, 1), padding=(0, 0),
-                          dilation=(1, 1), mask=None):
+                          dilation=(1, 1), mask=None, stable_coordinates=False):
     """The same fixed-shape operation with all kernel positions in one GridSample."""
     pair = lambda x: (x, x) if isinstance(x, int) else x
     stride, padding, dilation = map(pair, (stride, padding, dilation))
@@ -50,9 +50,16 @@ def compact_deform_conv2d(input, offset, weight, bias=None, stride=(1, 1), paddi
     yy = torch.arange(oh, **opts).view(1, 1, oh, 1)*stride[0]-padding[0]
     xx = torch.arange(ow, **opts).view(1, 1, 1, ow)*stride[1]-padding[1]
     offsets = offset.reshape(b, k, 2, oh, ow)
-    y = yy+ky*dilation[0]+offsets[:, :, 0]
-    x = xx+kx*dilation[1]+offsets[:, :, 1]
-    grid = torch.stack((2*(x+0.5)/w-1, 2*(y+0.5)/h-1), dim=-1)
+    if stable_coordinates:
+        # Keep small offsets out of large pixel coordinates before normalization.
+        # Constant base grids can be folded; this is algebraically the same map.
+        gx = (2*(xx+kx*dilation[1]+0.5)/w-1)+offsets[:, :, 1]*(2.0/w)
+        gy = (2*(yy+ky*dilation[0]+0.5)/h-1)+offsets[:, :, 0]*(2.0/h)
+    else:
+        y = yy+ky*dilation[0]+offsets[:, :, 0]
+        x = xx+kx*dilation[1]+offsets[:, :, 1]
+        gx, gy = 2*(x+0.5)/w-1, 2*(y+0.5)/h-1
+    grid = torch.stack((gx, gy), dim=-1)
     grid = grid.permute(0, 2, 1, 3, 4).reshape(b, oh, k*ow, 2)
     sampled = F.grid_sample(input, grid, mode='bilinear', padding_mode='zeros', align_corners=False)
     sampled = sampled.reshape(b, c, oh, k, ow).permute(0, 1, 3, 2, 4)

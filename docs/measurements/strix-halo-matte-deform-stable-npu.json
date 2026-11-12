@@ -1,0 +1,18 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": false,
+  "validate_only": true,
+  "feature_output": true,
+  "success": true,
+  "session_seconds": 10.613631729996996,
+  "providers": [
+    "VitisAIExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "relative_l2": 0.015115156769752502,
+  "profile": "/home/jethac/hairdeck-root/results/npu-matte-deform-stable/npu-ort-profile_2026-11-13_01-28-50_479.json",
+  "profile_provider_events": {
+    "VitisAIExecutionProvider": 1
+  }
+}

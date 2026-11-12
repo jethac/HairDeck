@@ -2,6 +2,7 @@
 
 This is a layer probe, not complete matting or a production model replacement.
 """
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -12,7 +13,10 @@ from hairdeck import paths
 from hairdeck.prep.matte import build
 from deform_grid import compact_deform_conv2d
 
-root = Path(paths.results('npu-matte-deform'))
+parser = argparse.ArgumentParser()
+parser.add_argument('--stable-coordinates', action='store_true')
+args = parser.parse_args()
+root = Path(paths.results('npu-matte-deform-stable' if args.stable_coordinates else 'npu-matte-deform'))
 root.mkdir(parents=True, exist_ok=True)
 model = build('birefnet_matting', 1024, device='cuda').net.float()
 x = torch.from_numpy(np.load(paths.results('npu-matte-grid', 'reference.npz'))['x']).cuda()
@@ -45,7 +49,8 @@ class Layer(torch.nn.Module):
 
     def forward(self, features, offset, mask):
         return compact_deform_conv2d(features, offset, self.weight, self.bias,
-                                     stride=capture['stride'], padding=capture['padding'], mask=mask)
+                                     stride=capture['stride'], padding=capture['padding'], mask=mask,
+                                     stable_coordinates=args.stable_coordinates)
 
 layer = Layer().eval()
 inputs = tuple(capture[k] for k in ('input', 'offset', 'mask'))
@@ -60,6 +65,7 @@ with torch.no_grad():
 np.savez(root/'reference.npz', features=inputs[0].cpu().numpy(), offset=inputs[1].cpu().numpy(),
          mask=inputs[2].cpu().numpy(), y=reference.cpu().numpy())
 metadata = dict(stage='first BiRefNet deformable convolution; real example-2 activations',
+                stable_coordinates=args.stable_coordinates,
                 shapes={k:list(capture[k].shape) for k in ('input','offset','weight','mask')},
                 output_shape=list(reference.shape), decomposition_relative_l2=error)
 (root/'export.json').write_text(json.dumps(metadata, indent=2))

@@ -145,7 +145,7 @@ The compact export took 7.210 s in this observation, excluding loading and equiv
 
 The compact model has its own `npu-matte-grid-compact` output/cache directory. Its native probe was started
 with `--validate-only` while the original compiler remained running; no uncontended latency measurement
-can be inferred from this overlapping compilation experiment. Placement and NPU correctness remain pending.
+can be inferred from this overlapping compilation experiment. This compact compile later failed as described below.
 
 ### Focused real-activation layer diagnostic
 
@@ -166,3 +166,38 @@ says "Whole-stage numerical gate"; its `feature_output: true` and this captured 
 layer probe. The error text was subsequently made generic.
 [Captured-layer metadata](measurements/strix-halo-matte-deform-export.json),
 [native result](measurements/strix-halo-matte-deform-npu.json).
+
+### Coordinate formulation improves the captured NPU layer
+
+`export_matte_deform.py --stable-coordinates` normalizes the constant base grid first, then adds the
+scaled offset: `base_normalized + offset * (2 / size)`. The earlier expression added the small offset
+to a potentially large pixel coordinate before normalizing. The two expressions are algebraically
+equivalent, but differ under reduced precision.
+
+The revised FP32 layer differed from torchvision by relative L2 **6.433e-7**. On the NPU, relative L2
+against the same original FP32 layer was **0.015115**, below the 0.02 diagnostic gate. The log recorded
+19 VAIML operators and one subgraph actually running on NPU. This is evidence that formulation matters
+for this captured layer; it is not proof that every remaining error comes from coordinate rounding,
+nor a whole-matte quality result. No timing was collected during concurrent full-model compilation.
+[Export metadata](measurements/strix-halo-matte-deform-stable-export.json),
+[native result](measurements/strix-halo-matte-deform-stable-npu.json).
+
+### Full-model compiler buffer failure, reduced to real attention
+
+The compact full-model compile terminated with AIE compiler error **77-6416**: an attention-transpose
+buffer dimension of **276480** exceeded its allocated **262144** elements. There was no whole-model
+execution or latency result. The native compiler terminated the process directly, so the Python probe
+could not write its usual exception report; the compiler log and process exit code are the evidence.
+
+`python tools/rocm/export_matte_attention.py` captures the actual second-scale
+`bb.layers.1.blocks.0.attn` module, with real example-2 input `[36,144,384]`. The exported module reproduces
+the same error at `/attention/Transpose_1`, in a much smaller graph. Forcing `--layout unvectorized`
+also failed with the identical buffer mismatch. Isolating only Transpose, or Transpose plus a dynamic
+MatMul, did **not** reproduce it: those graphs executed on CPU and the probe correctly rejected them as
+NPU evidence. Retaining the real attention module and weights preserves the failing compiler path.
+
+[Captured attention metadata](measurements/strix-halo-matte-attention-export.json),
+[compiler errors and exit codes](measurements/strix-halo-matte-buffer-failures.json).
+The original, larger decomposition compile remains a separate running experiment; do not treat the
+compact model's failure as its result. Further work should use the attention reduction to investigate
+tiling before paying another full-model compilation cost.

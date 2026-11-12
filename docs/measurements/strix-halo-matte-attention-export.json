@@ -1,0 +1,14 @@
+{
+  "stage": "BiRefNet bb.layers.1.blocks.0.attn, second image scale, real example-2 activations",
+  "input_shape": [
+    36,
+    144,
+    384
+  ],
+  "output_shape": [
+    36,
+    144,
+    384
+  ],
+  "mask_shape": null
+}

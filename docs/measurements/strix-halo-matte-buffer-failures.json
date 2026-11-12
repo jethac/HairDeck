@@ -1,0 +1,35 @@
+[
+  {
+    "attempt": "matte-compact-npu",
+    "layout": "auto",
+    "tp_size": 1,
+    "exit_code": 1,
+    "error_lines": [
+      "ERROR: [aiecompiler 77-6416] par.subgraph.be.mlir:8973:7 : The size of buffer_dimension is 276480, which should be less than or equal to SharedBuffer/ExternalBuffer(compute_graph.templated_graph__bb_layers_1_blocks_0_attn_1_Transpose_1_layer_0.templated_graph__bb_layers_1_blocks_0_attn_1_Transpose_1_layer_0_ofm_mem.in[0]) dimensions which is 262144 .",
+      "Compilation Failed",
+      "(WARNING:11, CRITICAL-WARNING:0, ERROR:1)"
+    ]
+  },
+  {
+    "attempt": "matte-attention-npu",
+    "layout": "auto",
+    "tp_size": 1,
+    "exit_code": 1,
+    "error_lines": [
+      "ERROR: [aiecompiler 77-6416] par.subgraph.be.mlir:148:7 : The size of buffer_dimension is 276480, which should be less than or equal to SharedBuffer/ExternalBuffer(compute_graph.templated_graph__attention_Transpose_1_layer_0.templated_graph__attention_Transpose_1_layer_0_ofm_mem.in[0]) dimensions which is 262144 .",
+      "Compilation Failed",
+      "(WARNING:11, CRITICAL-WARNING:0, ERROR:1)"
+    ]
+  },
+  {
+    "attempt": "matte-attention-unvectorized",
+    "layout": "unvectorized",
+    "tp_size": 1,
+    "exit_code": 1,
+    "error_lines": [
+      "ERROR: [aiecompiler 77-6416] par.subgraph.be.mlir:148:7 : The size of buffer_dimension is 276480, which should be less than or equal to SharedBuffer/ExternalBuffer(compute_graph.templated_graph__attention_Transpose_1_layer_0.templated_graph__attention_Transpose_1_layer_0_ofm_mem.in[0]) dimensions which is 262144 .",
+      "Compilation Failed",
+      "(WARNING:11, CRITICAL-WARNING:0, ERROR:1)"
+    ]
+  }
+]

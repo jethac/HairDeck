@@ -16,16 +16,19 @@ parser.add_argument('--root', required=True)
 parser.add_argument('--cpu-reference', action='store_true', help='Validate exported ONNX semantics without NPU compilation')
 parser.add_argument('--validate-only', action='store_true', help='Check placement and output, defer timing during other experiments')
 parser.add_argument('--feature-output', action='store_true', help='Layer diagnostic: apply L2 gate, not whole-matte alpha/IoU gates')
+parser.add_argument('--layout', choices=['auto','vectorized','unvectorized'], default='auto')
 args = parser.parse_args()
 root = Path(args.root)
 config = {'passes': [{'name': 'init', 'plugin': 'vaip-pass_init'},
           {'name': 'vaiml_partition', 'plugin': 'vaip-pass_vaiml_partition',
-           'vaiml_config': {'optimize_level': 1, 'preferred_data_storage': 'auto', 'tp_size': 1}}],
+           'vaiml_config': {'optimize_level': 1, 'preferred_data_storage': args.layout, 'tp_size': 1}}],
           'target': 'VAIML', 'targets': [{'name': 'VAIML', 'pass': ['init', 'vaiml_partition']}]}
-(root/'bf16-single-stamp.json').write_text(json.dumps(config, indent=2))
+config_path = root/f'bf16-single-stamp-{args.layout}.json'
+config_path.write_text(json.dumps(config, indent=2))
 report = dict(ort=ort.__version__, tp_size=1, cpu_reference=args.cpu_reference,
-              validate_only=args.validate_only, feature_output=args.feature_output, success=False)
+              validate_only=args.validate_only, feature_output=args.feature_output, layout=args.layout, success=False)
 tag = 'cpu-reference' if args.cpu_reference else 'npu'
+if args.layout != 'auto': tag += '-'+args.layout
 start = time.perf_counter()
 try:
     opts = ort.SessionOptions()
@@ -34,8 +37,9 @@ try:
     opts.enable_profiling = True
     opts.profile_file_prefix = str(root/(tag+'-ort-profile'))
     provider_args = dict(providers=['VitisAIExecutionProvider'], provider_options=[{
-            'config_file': str(root/'bf16-single-stamp.json'),
-            'cache_dir': str(root/'cache-tp1'), 'enable_cache_file_io_in_mem': '0'}])
+            'config_file': str(config_path),
+            'cache_dir': str(root/('cache-tp1' if args.layout == 'auto' else 'cache-tp1-'+args.layout)),
+            'enable_cache_file_io_in_mem': '0'}])
     if args.cpu_reference:
         provider_args = dict(providers=['CPUExecutionProvider'])
     session = ort.InferenceSession(str(root/'matte.onnx'), sess_options=opts, **provider_args)
@@ -49,7 +53,7 @@ try:
     y = session.run(None, feed)[-1]
     np.save(root/(tag+'-output.npy'), y)
     reference = data['y']
-    report['relative_l2'] = float(np.linalg.norm(y-reference)/np.linalg.norm(reference))
+    report['relative_l2'] = float(np.linalg.norm(y-reference)/max(1e-12, float(np.linalg.norm(reference))))
     alpha_ok = True
     if not args.feature_output:
         sigmoid = lambda x: 1/(1+np.exp(-np.clip(x, -80, 80)))
@@ -69,7 +73,8 @@ try:
     report['profile_provider_events'] = placements
     if not args.cpu_reference and not placements.get('VitisAIExecutionProvider'):
         raise RuntimeError('No VitisAI execution event; inspect compiler partition log before claiming NPU execution')
-    if (not np.isfinite(y).all() or report['relative_l2'] > (.0001 if args.cpu_reference else .02)
+    if (not np.isfinite(y).all() or not np.isfinite(report['relative_l2'])
+            or report['relative_l2'] > (.0001 if args.cpu_reference else .02)
             or not alpha_ok):
         raise RuntimeError('Numerical gate failed; no latency benchmark collected')
     if args.cpu_reference or args.validate_only:
