@@ -205,3 +205,7 @@ but idle. Raw stage timings, versions and output counts are in [the measurement 
 
 Later [batched-variation measurements and NPU export investigation](continued-optimization.md) cover the optional
 `HAIRDECK_BATCH_VARIATIONS=1` mode. It remains off by default because same-seed output changes.
+
+The whole-BiRefNet NPU experiment also remains disabled: the 768px graph fell back entirely to CPU,
+and a reduced equivalent layout compiled but timed out on the NPU. The linked investigation retains
+reproducers and rejected results; no whole-stage NPU acceleration or overlap is claimed.

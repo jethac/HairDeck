@@ -1,0 +1,27 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": false,
+  "validate_only": false,
+  "feature_output": false,
+  "layout": "auto",
+  "success": false,
+  "session_seconds": 1003.5096656680107,
+  "providers": [
+    "VitisAIExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "relative_l2": 1.4869320921206963e-06,
+  "alpha_mean_abs": 6.12078494555135e-08,
+  "alpha_max_abs": 5.644559860229492e-05,
+  "mask_iou": 1.0,
+  "production_alpha_mean_abs": 7.756741251796484e-05,
+  "production_alpha_max_abs": 0.0711551308631897,
+  "production_mask_iou": 0.9998060162044138,
+  "profile": "/home/jethac/hairdeck-root/results/npu-matte-grid-compact-flat-stable-broadcast-768-pipeline/npu-ort-profile_2026-11-13_01-53-28_692.json",
+  "profile_provider_events": {
+    "CPUExecutionProvider": 2790
+  },
+  "error": "RuntimeError: No VitisAI execution event; inspect compiler partition log before claiming NPU execution",
+  "elapsed_seconds": 1005.7214711470006
+}

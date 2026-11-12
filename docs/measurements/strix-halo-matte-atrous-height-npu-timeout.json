@@ -1,0 +1,16 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": false,
+  "validate_only": true,
+  "feature_output": true,
+  "layout": "auto",
+  "success": false,
+  "session_seconds": 30.861121861991705,
+  "providers": [
+    "VitisAIExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "error": "RuntimeException: [ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION : Non-zero status code returned while running vitis_ai_ep_1 node. Name:'VitisAIExecutionProvider_vitis_ai_ep_1_0' Status Message: ERROR: Failed to run forwardNoFailsafeImpl(), Reason: Subgraph vaiml_par_0 execution failed: Command failed to complete successfully (ERT_CMD_STATE_TIMEOUT)\nKernel Instance: DPU\nELF UUID:        df80d189-5a1a-e227-de23-015b0c2b1098\ntxn_op_idx = 0x000009F4\nctx_pc = 0x28B0FC09\nfatal_error_type = 0x00000000\nfatal_error_exception_type = 0x00000000\nfatal_error_exception_pc = 0x00000000\nfatal_error_app_module = 0x00000000\n: XRT run index 0 failed! Error State=ERT_CMD_STATE_TIMEOUT",
+  "elapsed_seconds": 32.90909640598693
+}

@@ -1,0 +1,153 @@
+{
+ "glb": {
+  "size": 13909052,
+  "chunks": [
+   [
+    "0x4e4f534a",
+    100840
+   ],
+   [
+    "0x4e4942",
+    13808184
+   ]
+  ]
+ },
+ "counts": {
+  "nodes": 138,
+  "meshes": 3,
+  "skins": 3,
+  "accessors": 143,
+  "bufferViews": 164,
+  "materials": 13,
+  "textures": 21,
+  "images": 21,
+  "samplers": 2,
+  "buffers": 1,
+  "scenes": 1
+ },
+ "extensions_used": [
+  "KHR_materials_unlit",
+  "VRM"
+ ],
+ "extensions_declared": [
+  "KHR_materials_unlit",
+  "VRM"
+ ],
+ "extensions_required": [],
+ "keep": {
+  "meta_fields": 8,
+  "meta_diff": [],
+  "humanoid_bones": [
+   54,
+   54
+  ],
+  "blend_shape_groups": [
+   14,
+   14
+  ],
+  "blend_shape_binds": [
+   14,
+   14
+  ],
+  "blend_shape_binds_equal_after_removing_hair_mesh_binds": true,
+  "first_person_bone": [
+   "J_Bip_C_Head",
+   "J_Bip_C_Head"
+  ]
+ },
+ "hair": {
+  "source_meshes": [
+   "Face(Clone).baked",
+   "Body.baked",
+   "Hair001.baked",
+   "Hair002.baked",
+   "Hair003.baked",
+   "Hair004.baked",
+   "Hair005.baked",
+   "Hair006.baked",
+   "Hair007.baked",
+   "Hair008.baked",
+   "Hair009.baked",
+   "Hair010.baked",
+   "Hair011.baked",
+   "Hair012.baked",
+   "Hair013.baked",
+   "Hair014.baked",
+   "Hair015.baked",
+   "Hair016.baked",
+   "Hair017.baked",
+   "Hair018.baked",
+   "Hair019.baked",
+   "Hair020.baked",
+   "Hair021.baked",
+   "Hair022.baked",
+   "Hair023.baked",
+   "Hair024.baked",
+   "Hair025.baked",
+   "Hair026.baked",
+   "Hair027.baked",
+   "Hair028.baked",
+   "Hair029.baked",
+   "Hair030.baked",
+   "Hair031.baked",
+   "Hair032.baked",
+   "Hair033.baked",
+   "Hair034.baked",
+   "Hair035.baked",
+   "Hair036.baked",
+   "Hair037.baked",
+   "Hair038.baked",
+   "Hair039.baked",
+   "Hair040.baked",
+   "Hair041.baked",
+   "Hair042.baked"
+  ],
+  "export_meshes": [
+   "Face(Clone).baked",
+   "Body.baked",
+   "Hair_gen"
+  ],
+  "hair_meshes_left": [],
+  "source_hair_named_nodes": 53,
+  "source_hair_named_nodes_left": [],
+  "protected_by_exporter": [],
+  "hair_gen_mesh": true
+ },
+ "gen": {
+  "chains_in": 18,
+  "chains_with_all_bone_nodes": 18,
+  "joint_err_mm_max_blender": 6.000602238524795e-05,
+  "joint_err_mm_max_dataset": 6.0006022401768545e-05,
+  "spring_groups_gen": 18,
+  "spring_groups_expected": 18,
+  "groups_root_and_path_ok": 18,
+  "roots_match_export": true,
+  "simulated_bones": 38,
+  "stiffness_err_max": 2.53016754214741e-08,
+  "kept_groups": 3,
+  "kept_groups_equal_control": [
+   true,
+   0.0
+  ],
+  "colliders_equal_control": [
+   true,
+   0.0
+  ],
+  "skin": {
+   "n_vertices_exported": 17372,
+   "primitives": 1,
+   "pos_err_mm_max": 0.00030958834364629747,
+   "per_bone_weight_err_max": 2.9799209877445776e-08,
+   "max_influences": 2,
+   "weight_sum_err_max": 2.9802322387695312e-08,
+   "frac_verts_with_chain_weight": 0.5021298641492056
+  },
+  "prep_verts": 17372
+ },
+ "control_sanity": [
+  [],
+  []
+ ],
+ "problems": [],
+ "ok": true
+}

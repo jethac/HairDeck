@@ -1,0 +1,18 @@
+{
+  "stage": "decoder.decoder_block3.dec_att.aspp_deforms.1.atrous_conv",
+  "source": "/workspace/hairdeck-root/results/npu-matte-grid-compact-flat-stable-broadcast-768-pipeline",
+  "input_shape": [
+    1,
+    64,
+    48,
+    48
+  ],
+  "output_shape": [
+    1,
+    256,
+    48,
+    48
+  ],
+  "decomposition_relative_l2": 9.606472985979053e-07,
+  "reference_precision": "FP32 arithmetic on production FP16-rounded weights"
+}

@@ -2,7 +2,12 @@
 
 The NPU's corrected BF16 MLP is still slower than the compiled GPU MLP. Working arithmetic alone does not
 justify inserting it into the GPU sampler. This pass measures batching and repeated GPU work, and probes
-whether the existing independent matting stage can reach the NPU compiler.
+whether the existing independent matting stage can run correctly on the NPU.
+
+**Outcome:** opt-in batching is deployed; another conditioning cache was deferred on measured cost.
+Whole-BiRefNet NPU offload is rejected for the tested Ryzen AI 1.9 configuration: the production-size
+model falls back entirely to CPU, and a reduced equivalent layout that compiles times out on device.
+No production NPU path or GPU/NPU-overlap speedup is claimed. The detailed evidence follows.
 
 **Measurement boundary correction:** the deployed `best` preset in `hairdeck/prep/presets.json` uses
 BiRefNet at **768px**, although SAM's working resolution is 1024px. The earlier standalone matting
@@ -55,7 +60,9 @@ throughout the motion rather than just the first frame.
 
 Raw results: [request timings](measurements/strix-halo-variations.json),
 [batch-2 numerics](measurements/strix-halo-variations-2-numerics.json),
-[batch-4 numerics](measurements/strix-halo-variations-4-numerics.json).
+[batch-4 numerics](measurements/strix-halo-variations-4-numerics.json),
+[VRM validation](measurements/strix-halo-variations-vrm-check.json),
+[motion preview metadata](measurements/strix-halo-variations-preview.json).
 
 ## Repeated conditioning: measured, additional cache deferred
 
@@ -280,7 +287,7 @@ The original FP16 network's sigmoid alpha is saved alongside the FP32-arithmetic
 probe compares against both before accepting any latency measurements.
 
 The export and ONNX CPU comparison passed. The native NPU attempt uses the separate artifact directory
-`npu-matte-grid-compact-flat-stable-broadcast-768-pipeline` and is still pending.
+`npu-matte-grid-compact-flat-stable-broadcast-768-pipeline`. It finished with CPU fallback, as detailed below.
 [Reformulation comparison](measurements/strix-halo-matte-production-equivalence.json),
 [export configuration](measurements/strix-halo-matte-production-export.json),
 [CPU and original FP16-alpha comparisons](measurements/strix-halo-matte-production-onnx-cpu.json).
@@ -292,3 +299,69 @@ On example 2 its ten warm observations had median **140.263 ms** and p90 **140.5
 compositing, SAM3, mask combination and model loading are excluded. The native NPU compiler was active
 during collection, so this is a **provisional baseline**, not an uncontended GPU/NPU comparison; repeat
 under matched load before claiming acceleration. [Raw observations](measurements/strix-halo-matte-production-gpu-provisional.json).
+
+
+### Production-size compile fell back to CPU
+
+The 768px attempt finished session construction after 1003.510 s. Its preliminary compiler report
+claimed support for 3075 of 3078 operators across four subgraphs, but that did not survive compilation.
+The log reported `No fixed TG lowering available`, including a fused offset-convolution transpose in
+`decoder.decoder_block3.dec_att.aspp_deforms.1.atrous_conv`:
+`transpose4d failed to find tiling solution for perm13`, dimensions `[9,2,48,48]`.
+
+ORT initialized successfully after those errors, with both execution providers registered. Actual
+profiling contained **2790 CPU events and no VitisAI event**. The probe rejected the fallback and did
+not collect latency samples. Its close numerical match is a CPU result, not evidence of NPU correctness.
+[Raw rejected result](measurements/strix-halo-matte-production-npu-fallback.json).
+
+`python tools/rocm/export_matte_atrous.py` captures that exact decoder block with real example-2
+activations at the deployed 768px input resolution. Unlike the earlier first-layer probe, it includes
+both learned offset and modulation convolutions, retaining the opportunity for the failing fusion.
+Its input is `[1,64,48,48]`; the compact stable-coordinate decomposition differs from the original
+FP32-arithmetic block by relative L2 `9.606473e-7`. The reduced native compilation reproduced the same `perm13` tiling error in 23.800 s, followed by CPU-only fallback.
+[Block export](measurements/strix-halo-matte-atrous-export.json),
+[tiling error](measurements/strix-halo-matte-atrous-tiling-error.json),
+[rejected runtime result](measurements/strix-halo-matte-atrous-npu-fallback.json).
+
+
+### Equivalent row packing compiles, but execution times out
+
+`python tools/rocm/export_matte_atrous.py --pack-height` keeps kernel positions adjacent to sampled
+rows instead of columns. This removes the kernel/row transpose while preserving sample ordering at
+the final convolution. The real-block FP32 comparison is again `9.606473e-7` relative L2.
+The native compiler builds one NPU subgraph, with session construction taking 30.861 s, but the first
+inference fails with `ERT_CMD_STATE_TIMEOUT`. The driver also records a TDR timeout at transaction
+`0x9f4`. No output or latency samples were accepted.
+[Export comparison](measurements/strix-halo-matte-atrous-height-export.json),
+[runtime timeout](measurements/strix-halo-matte-atrous-height-npu-timeout.json).
+
+Immediately afterward, the previously validated flat-head attention model still executed on the NPU
+with relative L2 `0.011146` and one VitisAI execution event.
+[Post-timeout known-working probe](measurements/strix-halo-matte-post-timeout-health.json).
+That distinguishes the failing graph from a generally unusable runtime; it does not identify the
+root cause of the new timeout. Neither the row-packed adapter nor any NPU path is enabled in production.
+
+For either reduced-block export, run the native probe with `--feature-output --validate-only` and its
+artifact directory (`npu-matte-atrous-768` or `npu-matte-atrous-768-height`). If exporting as root in the
+container, give that specific artifact directory back to the native user before running the probe.
+
+### Final disposition and remaining research
+
+Whole-stage NPU offload is rejected for this pass on the installed Ryzen AI 1.9 stack. We have not
+established a correct executable full model, so collecting whole-stage NPU latency or concurrent GPU/NPU
+throughput would not answer the intended comparison. Further work needs compiler/runtime fixes for
+the retained reproducers, or an explicitly evaluated replacement model. No smaller model is proposed
+as a quality-equivalent default. Transfer, scheduling, contention and power measurements remain research
+gaps, not hidden components of an asserted speedup.
+
+With all experimental compiles finished, the deployed 768px GPU matting stage measured **132.189 ms
+median**, **133.420 ms p90** across ten warm observations on example 2. The demo remained resident;
+this is not an isolated whole-machine/power benchmark. It uses the CPU-RGB-to-CPU-alpha boundary above,
+excluding loading/compositing, SAM3 and mask combination.
+[Final GPU observations](measurements/strix-halo-matte-production-gpu.json).
+
+The accepted batching path remains opt-in, with its first-use cost, output differences and memory
+measurements recorded above. Existing real-request artifacts cover generation, colors, chains and
+GLBs; the batched seed-3 motion preview and validated VRM are retained on the target. The native Arch
+runtime and live ROCm demo remain intact. This completes the measured optimization pass, not a claim
+that HairDeck or the hardware has no further optimization potential.

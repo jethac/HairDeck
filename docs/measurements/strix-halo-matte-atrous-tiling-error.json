@@ -1,0 +1,23 @@
+{
+  "source_log": "/home/jethac/hairdeck-npu/matte-atrous-npu.log",
+  "model": "decoder.decoder_block3.dec_att.aspp_deforms.1.atrous_conv",
+  "error": "TG_ERR: transpose4d failed to find tiling solution for perm13",
+  "operator": "Transpose4dTGTiling(_offset_conv_Conv_Duplicated_2)",
+  "dimensions": [
+    9,
+    2,
+    48,
+    48
+  ],
+  "fused_nodes": [
+    "/offset_conv/Conv",
+    "/Mul_1",
+    "/Gather",
+    "/Unsqueeze",
+    "/Mul_2",
+    "/Gather_1",
+    "/Unsqueeze_1",
+    "/Transpose"
+  ],
+  "observed_outcome": "CPU-only fallback; no VitisAI execution events"
+}

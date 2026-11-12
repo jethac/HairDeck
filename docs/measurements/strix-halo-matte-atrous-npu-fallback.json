@@ -1,0 +1,21 @@
+{
+  "ort": "1.30.0",
+  "tp_size": 1,
+  "cpu_reference": false,
+  "validate_only": true,
+  "feature_output": true,
+  "layout": "auto",
+  "success": false,
+  "session_seconds": 23.799657133000437,
+  "providers": [
+    "VitisAIExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "relative_l2": 9.199196711051627e-07,
+  "profile": "/home/jethac/hairdeck-root/results/npu-matte-atrous-768/npu-ort-profile_2026-11-13_02-11-23_189.json",
+  "profile_provider_events": {
+    "CPUExecutionProvider": 28
+  },
+  "error": "RuntimeError: No VitisAI execution event; inspect compiler partition log before claiming NPU execution",
+  "elapsed_seconds": 23.807391039008508
+}
