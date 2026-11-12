@@ -15,6 +15,10 @@ p.add_argument('--compile', action='store_true')
 p.add_argument('--linear', action='store_true')
 p.add_argument('--width',type=int,default=0)
 p.add_argument('--layout',choices=['auto','unvectorized','vectorized'],default='unvectorized')
+p.add_argument('--tp-size',type=int,choices=[0,1,2],default=1,
+               help='Use one compute stamp to avoid the Ryzen AI 1.9 two-stamp codegen defect; 0 reproduces auto')
+p.add_argument('--max-relative-l2',type=float,default=0.02,
+               help='Fail the real-device probe above this FP32-reference error; does not enable production inference')
 a=p.parse_args()
 root=Path(a.root); root.mkdir(parents=True,exist_ok=True)
 if a.mode in ('export','gpu'):
@@ -48,15 +52,24 @@ if a.mode in ('export','gpu'):
 else:
     import onnxruntime as ort
     config={'passes':[{'name':'init','plugin':'vaip-pass_init'}, {'name':'vaiml_partition','plugin':'vaip-pass_vaiml_partition','vaiml_config':{'optimize_level':1,'preferred_data_storage':a.layout}}], 'target':'VAIML','targets':[{'name':'VAIML','pass':['init','vaiml_partition']}]}
+    if a.tp_size:
+        config['passes'][1]['vaiml_config']['tp_size']=a.tp_size
     (root/'bf16.json').write_text(json.dumps(config))
     opts=ort.SessionOptions(); opts.log_severity_level=1
     start=time.perf_counter()
-    session=ort.InferenceSession(str(root/'mlp.onnx'),sess_options=opts,providers=['VitisAIExecutionProvider'],provider_options=[{'config_file':str(root/'bf16.json'),'cache_dir':str(root/('cache-'+a.layout)),'enable_cache_file_io_in_mem':'0'}])
+    session=ort.InferenceSession(str(root/'mlp.onnx'),sess_options=opts,providers=['VitisAIExecutionProvider'],provider_options=[{'config_file':str(root/'bf16.json'),'cache_dir':str(root/('cache-'+a.layout+'-tp'+str(a.tp_size))),'enable_cache_file_io_in_mem':'0'}])
     print('session_seconds',time.perf_counter()-start,flush=True)
     assert 'VitisAIExecutionProvider' in session.get_providers(), 'CPU-only fallback'
     data=np.load(root/'reference.npz')
     def run(): return session.run(None,{'x':data['x']})[0]
     def sync(): pass
+# Reject incorrect execution before collecting performance numbers.
+probe=run(); sync()
+probe=probe.float().cpu().numpy() if a.mode=='gpu' else probe
+probe_error=float(np.linalg.norm(probe-data['y'])/np.linalg.norm(data['y']))
+np.save(root/(a.mode+'-output.npy'),probe)
+if not np.isfinite(probe_error) or probe_error > a.max_relative_l2:
+    raise RuntimeError(f"Numerically invalid output before timing: relative L2 {probe_error:.6f} exceeds {a.max_relative_l2}")
 for _ in range(5): result=run()
 sync(); times=[]
 for _ in range(50):
@@ -64,5 +77,8 @@ for _ in range(50):
 if a.mode=='gpu': result=result.float().cpu().numpy()
 np.save(root/(a.mode+'-output.npy'),result)
 ref=data['y']; metrics=dict(mode=a.mode,compiled=a.compile,median_ms=float(np.median(times)),p90_ms=float(np.percentile(times,90)),relative_l2=float(np.linalg.norm(result-ref)/np.linalg.norm(ref)),max_absolute_error=float(np.max(np.abs(result-ref))),shape=list(ref.shape))
+metrics.update(layout=a.layout,tp_size=a.tp_size)
 print(json.dumps(metrics),flush=True)
 (root/(a.mode+('-compiled' if a.compile else '')+'-metrics.json')).write_text(json.dumps(metrics,indent=2))
+if not np.isfinite(metrics['relative_l2']) or metrics['relative_l2'] > a.max_relative_l2:
+    raise RuntimeError(f"Numerically invalid output: relative L2 {metrics['relative_l2']:.6f} exceeds {a.max_relative_l2}")

@@ -9,7 +9,8 @@ add hardware exploration. Experiments stay separate from the working default unt
 - Can an independent preprocessing stage (for example matting) run on the XDNA2 NPU concurrently with GPU SAM3?
   First establish runtime availability, operator coverage and model conversion, then compare quality and end-to-end
   latency. Existing driver/device: amdxdna and /dev/accel/accel0. AMD's current Linux Ryzen AI docs support BF16 CNN and
-  encoder models. Native Arch runtime and vendor quicktest now work; the HairDeck BF16 probe below is incorrect.
+  encoder models. Native Arch runtime and vendor quicktest work; the HairDeck BF16 probe now has a verified
+  single-stamp compiler workaround (see below), but remains slower than the GPU.
   Avoid equating advertised TOPS with benefit.
 - Does overlapping actual generation and preview work help on this APU? The experiment below measures this directly.
   Unified physical memory does not by itself establish zero-copy tensor access or memory-bandwidth saturation.
@@ -37,7 +38,7 @@ For each experiment record the hypothesis, exact commands/revisions, cold/warm s
 output-quality comparison, measurements and conclusion. Include failed and neutral results; do not fabricate a
 positive result or extrapolate isolated-stage wins into end-to-end claims. This is source material, not a blog draft.
 
-## HairDeck MLP NPU experiment: incorrect output, not deployable
+## Initial HairDeck MLP NPU experiment: incorrect output
 
 `tools/rocm/bench_npu_mlp.py` exports actual `blocks.0.mlp` weights from the released image model. Inputs are synthetic
 standard-normal activations, seed 42, shape (2,192,768); the MLP expands to 3072 channels and uses tanh GELU.
@@ -65,8 +66,8 @@ AMD xdna-driver branch 1.9 at `a1f7a2fe`, with pinned XRT `e9db9ab15f10173f8d2fc
 built natively with `SKIP_KMOD=ON` and a private install prefix. Recompiling with fresh caches on that stack gives
 the same error with both `--layout auto` and `--layout vectorized`. `/proc/self/maps` confirmed that core, coreutil
 and XDNA shim libraries all loaded from the private 2.26 directory. The newer 2.27 userspace version and the layout
-choice therefore do not explain this failure. No kernel driver was replaced. The underlying compiler/runtime
-defect remains unresolved; the NPU MLP path is rejected for deployment. The working ROCm path is unaffected.
+choice therefore do not explain this failure. No kernel driver was replaced. The defect was subsequently localized
+and mitigated as described below. The working ROCm path is unaffected.
 
 ## Concurrent preview and generation
 
@@ -82,5 +83,23 @@ independent preview and generation jobs, so no additional scheduling change was 
 [strix-halo-overlap.json](measurements/strix-halo-overlap.json).
 
 The deployed workflow's process-cold, new-image, repeat-image and multi-variation timings are in
-[rocm.md](rocm.md#deployed-workflow-measurements), with a runnable probe and raw measurements. The remaining NPU BF16
-compiler/runtime defect is a separate research lead, not an enabled optimization or a prerequisite for GPU operation.
+[rocm.md](rocm.md#deployed-workflow-measurements), with a runnable probe and raw measurements.
+
+## BF16 diagnosis and verified workaround (2026-11-13)
+
+The failure is in the compiler's work partitioning and generated graph. A checkpoint-free identity Gemm with
+M=128, K=N=768 reproduces it exactly. XRT buffer tracing confirms the input reaches the device intact and the returned
+BF16 output already has zeroes in its second half, before host conversion. Compiler intermediates plan two compute
+stamps split across output channels, but the generated graph instantiates only stamp 0, covering 384 of 768 channels.
+
+Setting `vaiml_config.tp_size=1` makes the tiler cover all output channels with the emitted stamp. The identity probe
+then matches the CPU exactly. The original released-weight Linear and three-dimensional MLP produce no all-zero
+channels, with relative L2 0.00944 and 0.00807 respectively against FP32. The compiler uses BFP16 weight packing,
+so the residual error should not be attributed solely to BF16 activation rounding.
+
+`tools/rocm/bench_npu_mlp.py` now defaults to this workaround, separates caches by tp_size, and fails if relative L2
+exceeds the probe's explicit 2% bound. `--tp-size 0` retains the automatic path for reproducing the defect. This is
+a scoped compiler configuration workaround, not an upstream compiler patch or end-to-end NPU HairDeck acceptance.
+The corrected MLP remains slower than ROCm, so no NPU path is enabled in the demo. Complete commands, trace source,
+library hashes, generated-code evidence and limitations are in the
+[Arch fork diagnosis](https://github.com/jethac/ryzen-ai-arch/blob/main/docs/bf16-stamp-mismatch.md).

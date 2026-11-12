@@ -177,8 +177,10 @@ CPU time. A diagnostic sent the same rendered frames through both paths and conf
 hashes. Separate rendering runs are not bitwise deterministic and are unsuitable for testing encoding equivalence.
 
 The target also exposes its NPU (`amdxdna`, `/dev/accel/accel0`). A native Arch runtime now executes AMD's vendor
-model with output identical to CPU on a seeded diagnostic input. HairDeck's isolated BF16 MLP probe instead produces
-incorrect output on both XRT 2.27 and SDK-matched 2.26. NPU offload is therefore not enabled. See
+model with output identical to CPU on a seeded diagnostic input. HairDeck's isolated BF16 MLP initially produced
+incorrect output on both XRT 2.27 and SDK-matched 2.26. A two-stamp compiler plan emitted only one compute stamp.
+`tp_size=1` fixes the missing channels; the corrected probe remains slower than the GPU, so production NPU offload
+is not enabled. See
 [the hardware investigation](strix-halo-investigation.md) and [the Arch fork](https://github.com/jethac/ryzen-ai-arch).
 
 ## Deployed workflow measurements
